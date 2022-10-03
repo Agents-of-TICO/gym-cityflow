@@ -7,7 +7,7 @@ from gym.utils import seeding
 
 
 class Cityflow(gym.Env):
-    metadata = {'render_modes': ['human']}
+    metadata = {'render_modes': ['human'], 'render_fps': 4}
 
     def __init__(self, config_path, episode_steps, render_mode=None):
         # steps per episode
@@ -120,7 +120,14 @@ class Cityflow(gym.Env):
         self.eng.reset(seed=False)
         self.is_done = False
         self.current_step = 0
-        return self._get_observation()
+
+        observation = self._get_observation()
+        info = self._get_info()
+
+        if self.render_mode == "human":
+            self.render()
+
+        return observation, info
 
     def render(self, mode='human'):
         print("Current time: " + self.cityflow.get_current_time())
@@ -139,6 +146,11 @@ class Cityflow(gym.Env):
             self.observation[key] = waiting_intersection
 
         return self.observation
+
+    def _get_obs(self):
+        # Get information about environment state
+    def _get_info(self):
+        # Get information about environment state
 
     def getReward(self):
         reward = []
@@ -234,6 +246,3 @@ class Cityflow(gym.Env):
             self.waiting_vehicles_reward.pop(item)
 
         return reward
-
-    def seed(self, seed=None):
-        self.eng.set_random_seed(seed)
