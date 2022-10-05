@@ -83,7 +83,7 @@ TRUE_CORRECTION_lane = True
 SUMO_PROGRAM = True
 
 
-def get_direction_fron_connection(connection):
+def get_type_from_connection(connection):
     _map = {
         Connection.LINKDIR_STRAIGHT: "go_straight",
         Connection.LINKDIR_TURN: "turn_u",
@@ -102,33 +102,33 @@ def process_edge(edge):
             outgoing_list = lane.getOutgoing()
             for outgoing in outgoing_list:
                 new_lane = copy.copy(lane)
-                direction = get_direction_fron_connection(outgoing)
+                type = get_type_from_connection(outgoing)
                 to_lane = outgoing.getToLane()
                 # marky,add to_lane
-                new_lane._cityflow_lane_id = f'{lane.getID()}|{to_lane.getID()}|{direction}'
+                new_lane._cityflow_lane_id = f'{lane.getID()}|{to_lane.getID()}|{type}'
                 new_lane._cityflow_lane_inx = inx
-                new_lane._direction = direction
+                new_lane._type = type
                 lanes.append(new_lane)
             if len(outgoing_list) == 0:
                 new_lane = copy.copy(lane)
                 new_lane._cityflow_lane_id = f'{lane.getID()}'
                 new_lane._cityflow_lane_inx = inx
-                new_lane._direction = 'go_end'
+                new_lane._type = 'go_end'
                 lanes.append(new_lane)
     else:
         for lane in edge.getLanes():
             outgoing_list = lane.getOutgoing()
             for outgoing in outgoing_list:
                 new_lane = copy.copy(lane)
-                direction = get_direction_fron_connection(outgoing)
+                type = get_type_from_connection(outgoing)
                 to_lane = outgoing.getToLane()
-                new_lane._cityflow_lane_id = f'{lane.getID()}|{to_lane.getID()}|{direction}'
-                new_lane._direction = direction
+                new_lane._cityflow_lane_id = f'{lane.getID()}|{to_lane.getID()}|{type}'
+                new_lane._type = type
                 lanes.append(new_lane)
             if len(outgoing_list) == 0:
                 new_lane = copy.copy(lane)
                 new_lane._cityflow_lane_id = f'{lane.getID()}'
-                new_lane._direction = 'go_end'
+                new_lane._type = 'go_end'
                 lanes.append(new_lane)
     edge._cityflow_lanes = lanes[::-1]
     return edge
@@ -161,17 +161,6 @@ def _is_node_virtual(node):
         return True
     else:
         return False
-
-
-def group_connections_by_start_end(connections):
-    connection_group_result = defaultdict(list)
-    for connection in connections:
-        start_road = connection.getFrom()
-        end_road = connection.getTo()
-        direction = get_direction_fron_connection(connection)
-        key = "{}|{}|{}".format(start_road.getID(), end_road.getID(), direction)
-        connection_group_result[key].append(connection)
-    return connection_group_result
 
 
 def calc_edge_compass_angle(edge):
@@ -327,26 +316,27 @@ def node_to_intersection(node, tls_dict, edge_dict):
         "virtual": _is_node_virtual(node)  # dead_end判断为virtual
     }
 
-    connections_group = group_connections_by_start_end(node.getConnections())
     roadLinks = intersection['roadLinks']
-    for k, v in connections_group.items():
-        connection_template = v[0]
-        start_road = connection_template.getFrom()
-        end_road = connection_template.getTo()
+    directions = []
+    for connection in node.getConnections():
+        start_road = connection.getFrom()
+        if start_road not in directions:
+            directions.append(start_road)
+        end_road = connection.getTo()
         # 加上驶入方向的正北夹角
-        raw_roadlink_type = get_direction_fron_connection(connection_template)
+        raw_roadlink_type = get_type_from_connection(connection)
         roadLink = {
             "type": raw_roadlink_type,
             "startRoad": start_road.getID(),
             "endRoad": end_road.getID(),
-            "direction": 0,  # WARNING: direction is falsely defined but it doesn't affect usage
+            "direction": directions.index(start_road),
             "laneLinks": []
         }
         if roadLink["type"] == "turn_u":
             roadLink["type"] = U_TURN_AS
 
         for start_lane in reversed(start_road._cityflow_lanes):
-            if start_lane._direction != raw_roadlink_type:
+            if start_lane._type != raw_roadlink_type:
                 continue
             ## TODO lane enumerate
             if TRUE_CORRECTION_lane:
@@ -526,7 +516,7 @@ def main(args):
         "roads": final_roads
     }
 
-    f = open(args.cityflownet, 'w')
+    f = open(args.roadnet, 'w')
     json.dump(result, f, indent=2)
     f.close()
 

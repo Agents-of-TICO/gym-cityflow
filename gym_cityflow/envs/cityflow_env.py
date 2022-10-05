@@ -1,6 +1,8 @@
 import gym
 from gym import spaces
 import numpy as np
+import cityflow
+import json
 
 
 test = spaces.Discrete(2)
@@ -11,7 +13,12 @@ test.add()
 class GridWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size=5):
+    def __init__(self, config_path, num_steps=10000, render_mode=None):
+        # open cityflow config file into dict
+        self.configDict = json.load(open(config_path))
+        # open cityflow roadnet file into dict
+        self.roadnetDict = json.load(open(self.configDict['dir'] + self.configDict['roadnetFile']))
+        self.flowDict = json.load(open(self.configDict['dir'] + self.configDict['flowFile']))
         self.size = size  # The size of the square grid
 
         # Observations are dictionaries with the agent's and the target's location.
@@ -22,11 +29,23 @@ class GridWorldEnv(gym.Env):
                 "target": spaces.Box(0, size - 1, shape=(2,), dtype=int),
             }
         )
+
+        # Get list of non-virtual intersections
+        intersections = list(filter(lambda val: not val['virtual'], self.roadnetDict['intersections']))
+
+        # Get number of available phases in each intersection.
+        intersection_phases = [len(intersections)]
+        for i, intersection in enumerate(intersections):
+            intersection_phases[i] = len(intersection['trafficLight']['lightphases'])
+
+        # Observations are multidimensional arrays containing the number of waiting vehicles in each lane
+        # for each intersection. Each lane can have at most 64 vehicles waiting, so an observation can be
+        # encoded
         self.observation_space = spaces.Dict(
             {
                 "intersection_1": spaces.Dict(
                     {
-                        "state": spaces.Discrete(8),
+                        "phase": spaces.Box(0, num_phases - 1, shape=(1,), dtype=int),
                         "north": spaces.Discrete(num_lanes_n),
                         "south": spaces.Discrete(num_lanes_s),
                         "east": spaces.Discrete(num_lanes_e),
