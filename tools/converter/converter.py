@@ -8,7 +8,6 @@ from mpmath import degrees, radians
 import copy
 import math
 import json
-import cityflow
 
 if platform == "linux" or platform == "linux2":
     # this is linux
@@ -47,7 +46,7 @@ elif platform == "win32":
         else:
             raise EnvironmentError("Please set SUMO_HOME environment variable or install traci as python module!")
 
-elif platform =='darwin':
+elif platform == 'darwin':
     os.environ['SUMO_HOME'] = "/Users/{0}/sumo/".format(os.environ.get('USER'))
     print(os.environ['SUMO_HOME'])
     try:
@@ -70,11 +69,13 @@ elif platform =='darwin':
 else:
     sys.exit("platform error")
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sumonet", type=str,default='atlanta_sumo.net.xml')
-    parser.add_argument("--cityflownet", type=str,default='atlanta_cityflow.json')
+    parser.add_argument("--sumonet", type=str, default='osm.net.xml')
+    parser.add_argument("--roadnet", type=str, default='cityflow_roadnet.json')
     return parser.parse_args()
+
 
 U_TURN_AS = "turn_left"
 DEBUG = False
@@ -93,10 +94,11 @@ def get_direction_fron_connection(connection):
     }
     return _map[connection.getDirection()]
 
+
 def process_edge(edge):
     lanes = []
     if TRUE_CORRECTION_lane:
-        for inx,lane in enumerate(reversed(edge.getLanes())):
+        for inx, lane in enumerate(reversed(edge.getLanes())):
             outgoing_list = lane.getOutgoing()
             for outgoing in outgoing_list:
                 new_lane = copy.copy(lane)
@@ -132,13 +134,12 @@ def process_edge(edge):
     return edge
 
 
-
-
 def _cityflow_get_lane_index_in_edge(lane, edge):
     for i, _lane in enumerate(edge._cityflow_lanes):
         if _lane._cityflow_lane_id == lane._cityflow_lane_id:
             return i
     raise Exception('lane in edge not found')
+
 
 def _cityflow_get_lane_index_in_edge_cor(lane, edge):
     ## i = lane._cityflow_lane_id.split('|')[0]
@@ -156,7 +157,7 @@ def _is_node_virtual(node):
     n = node
     edges = [edge for edge in n.getIncoming() + n.getOutgoing()]
     ids = list(set([e.getFromNode().getID() for e in edges] + [e.getToNode().getID() for e in edges]))
-    if len(ids)<=2:
+    if len(ids) <= 2:
         return True
     else:
         return False
@@ -181,8 +182,8 @@ def calc_edge_compass_angle(edge):
     angle = (angle + 2 * sympy.pi) % (2 * sympy.pi)
     angle_degrees = float(degrees(angle))
     angle_radians = float(radians(degrees(angle)))
-    edge._angle_degrees = round(angle_degrees,4)
-    edge._angle_radians = round(angle_radians,4)
+    edge._angle_degrees = round(angle_degrees, 4)
+    edge._angle_radians = round(angle_radians, 4)
     return angle_degrees, angle_radians
 
 
@@ -229,71 +230,73 @@ def _cal_angle_pair(cluster):
         near180_2 = abs(180 - r2)
         near180_3 = abs(180 - r3)
         lista = [
-            ([(centroids[0], centroids[1]), (centroids[2],)],near180_1),
-            ([(centroids[0], centroids[2]), (centroids[1],)],near180_2),
-            ([(centroids[0],),(centroids[1], centroids[2]),],near180_3),
+            ([(centroids[0], centroids[1]), (centroids[2],)], near180_1),
+            ([(centroids[0], centroids[2]), (centroids[1],)], near180_2),
+            ([(centroids[0],), (centroids[1], centroids[2]), ], near180_3),
         ]
-        pairs = min(lista,key=lambda item:item[1])[0]
+        pairs = min(lista, key=lambda item: item[1])[0]
     elif len(centroids) == 2:
         pairs = [(centroids[0], centroids[1]), ]
     elif len(centroids) == 1:
-        pairs = [(centroids[0],),]
+        pairs = [(centroids[0],), ]
     return pairs
 
 
-def find_edges_by_angle(all_edges,angle):
+def find_edges_by_angle(all_edges, angle):
     edges = []
     for edge in all_edges:
-        if math.isclose(edge._angle_degrees , angle, abs_tol=0.0001):
-        # if edge._angle_degrees == angle:
+        if math.isclose(edge._angle_degrees, angle, abs_tol=0.0001):
+            # if edge._angle_degrees == angle:
             edges.append(edge)
     if not edges:
         raise Exception('!!!no edge._angle_degrees = angle')
     return edges
 
-def find_edges_by_cluster_centroid(all_edges,angle):
+
+def find_edges_by_cluster_centroid(all_edges, angle):
     edges = []
     for edge in all_edges:
-        if math.isclose(edge._cluster_centroid[0] , angle, abs_tol=0.0001):
-        # if edge._angle_degrees == angle:
+        if math.isclose(edge._cluster_centroid[0], angle, abs_tol=0.0001):
+            # if edge._angle_degrees == angle:
             edges.append(edge)
     if not edges:
         raise Exception('!!!no edge._cluster_centroid[0] = angle')
     return edges
 
 
-
 def get_all_turn_right_link_index(roadLinks):
     allow = []
-    for index,roadlink in enumerate(roadLinks):
+    for index, roadlink in enumerate(roadLinks):
         if roadlink['type'] == 'turn_right':
             allow.append(index)
     return allow
 
 
-def filter_roadlinks_by_startedge_and_turn_type(roadLinks,edge,turntype):
+def filter_roadlinks_by_startedge_and_turn_type(roadLinks, edge, turntype):
     result = []
-    for index,roadlink in enumerate(roadLinks):
-        if roadlink['startRoad'] == edge.getID() and roadlink['type']==turntype:
-            result.append((index,roadlink))
+    for index, roadlink in enumerate(roadLinks):
+        if roadlink['startRoad'] == edge.getID() and roadlink['type'] == turntype:
+            result.append((index, roadlink))
     return result
 
-def filter_roadlinks_by_startedge(roadLinks,lane_id):
+
+def filter_roadlinks_by_startedge(roadLinks, lane_id):
     result = []
-    edge_id,lane_index  = lane_id.split('_')
-    for index,roadlink in enumerate(roadLinks):
+    edge_id, lane_index = lane_id.split('_')
+    for index, roadlink in enumerate(roadLinks):
         lane_index_list = []
         for laneLink in roadlink['laneLinks']:
             lane_index_list.append(laneLink['startLaneIndex'])
         lane_index_list = list(set(lane_index_list))
 
         if roadlink['startRoad'] == edge_id and int(lane_index) in lane_index_list:
-            result.append((index,roadlink))
+            result.append((index, roadlink))
     return result
 
-def fill_empty_phase(current_phase,count):
+
+def fill_empty_phase(current_phase, count):
     need_fill_count = count - len(current_phase)
-    for x in range(need_fill_count):#no question
+    for x in range(need_fill_count):  # no question
         empty_phase_dict = {
             'availableRoadLinks': [],
             'time': 0,
@@ -301,10 +304,12 @@ def fill_empty_phase(current_phase,count):
         current_phase.append(empty_phase_dict)
     return current_phase
 
+
 all_phase_dict = {}
 node_outgoing_dict = {}
 
-def node_to_intersection(node,tls_dict,edge_dict):
+
+def node_to_intersection(node, tls_dict, edge_dict):
     node_type = node.getType()
     node_coord = node.getCoord()
     intersection = {
@@ -321,7 +326,6 @@ def node_to_intersection(node,tls_dict,edge_dict):
         },
         "virtual": _is_node_virtual(node)  # dead_end判断为virtual
     }
-
 
     connections_group = group_connections_by_start_end(node.getConnections())
     roadLinks = intersection['roadLinks']
@@ -341,13 +345,12 @@ def node_to_intersection(node,tls_dict,edge_dict):
         if roadLink["type"] == "turn_u":
             roadLink["type"] = U_TURN_AS
 
-
         for start_lane in reversed(start_road._cityflow_lanes):
             if start_lane._direction != raw_roadlink_type:
                 continue
             ## TODO lane enumerate
             if TRUE_CORRECTION_lane:
-                for end_inx,end_lane in enumerate(reversed(end_road._lanes)):
+                for end_inx, end_lane in enumerate(reversed(end_road._lanes)):
                     start_point = start_lane.getShape()[-1]
                     start_point = point_tuple_to_dict(start_point)
                     end_point = end_lane.getShape()[0]
@@ -373,7 +376,6 @@ def node_to_intersection(node,tls_dict,edge_dict):
                     roadLink["laneLinks"].append(path)
         roadLinks.append(roadLink)
 
-
     for i, _ in enumerate(intersection["roadLinks"]):
         intersection["trafficLight"]["roadLinkIndices"].append(i)
 
@@ -383,9 +385,8 @@ def node_to_intersection(node,tls_dict,edge_dict):
         pass
     if node_type in ['right_before_left']:
         pass
-    if node_type in ['dead_end','priority','right_before_left']:
+    if node_type in ['dead_end', 'priority', 'right_before_left']:
         intersection = process_intersection_simple_phase(intersection)
-
 
     if node_type in ['traffic_light']:
         print(node.getID())
@@ -396,19 +397,19 @@ def node_to_intersection(node,tls_dict,edge_dict):
             G_to_lane_dict = {}
             for connec in tls_dict[nodeid]._connections:
                 G_to_lane_dict[connec[-1]] = connec[0].getID()
-            #for phase,duration in tls_dict[nodeid]._programs['0']._phases:
-            for currentPhase in tls_dict[nodeid]._programs['0']._phases :
+            # for phase,duration in tls_dict[nodeid]._programs['0']._phases:
+            for currentPhase in tls_dict[nodeid]._programs['0']._phases:
                 lane_list = []
-                #for i,alpha in enumerate(phase):
-                for i,alpha in enumerate(currentPhase.state):
+                # for i,alpha in enumerate(phase):
+                for i, alpha in enumerate(currentPhase.state):
                     if (alpha == 'G' or alpha == 'g') and i in G_to_lane_dict.keys():
                         lane_list.append(G_to_lane_dict[i])
 
                 lane_list_ = []
                 for lane in lane_list:
-                    edge_id,lane_id=lane.split('_')
+                    edge_id, lane_id = lane.split('_')
                     lane_id = int(lane_id)
-                    lane_ = edge_id + '_' + str(len(edge_dict[edge_id])-lane_id-1)
+                    lane_ = edge_id + '_' + str(len(edge_dict[edge_id]) - lane_id - 1)
                     lane_list_.append(lane_)
 
                 all_phase_dict[nodeid].append(list(set(lane_list_)))
@@ -419,7 +420,7 @@ def node_to_intersection(node,tls_dict,edge_dict):
                     index_list += [item[0] for item in index_roadlink_list]
                 phase_dict = {
                     'availableRoadLinks': list(set(index_list)),
-                    'time': currentPhase.duration#'time':duration
+                    'time': currentPhase.duration  # 'time':duration
                 }
                 all_phase.append(phase_dict)
             intersection["trafficLight"]["lightphases"] = all_phase
@@ -428,7 +429,7 @@ def node_to_intersection(node,tls_dict,edge_dict):
             edge_list_ = [edge_.getID() for edge_ in node.getOutgoing()]
             for edge in edge_list_:
                 for i in range(len(edge_dict[edge])):
-                    outgoing_lane_list.append(edge+'_'+str(i))
+                    outgoing_lane_list.append(edge + '_' + str(i))
             node_outgoing_dict[nodeid] = outgoing_lane_list
 
         exiting_lane_list = []
@@ -437,23 +438,24 @@ def node_to_intersection(node,tls_dict,edge_dict):
 
     return intersection
 
-def get_final_intersections(net,tls_dict,edge_dict):
 
+def get_final_intersections(net, tls_dict, edge_dict):
     final_intersections = []
     net_nodes = net.getNodes()
-    net_nodes_sorted = sorted(net_nodes,key=lambda n:n.getID())
-    nodes = [(index,node) for index,node in enumerate(net_nodes_sorted)]
+    net_nodes_sorted = sorted(net_nodes, key=lambda n: n.getID())
+    nodes = [(index, node) for index, node in enumerate(net_nodes_sorted)]
     nodes = nodes[:]
     for obj in nodes:
 
         index = obj[0]
         node = obj[1]
 
-        intersection = node_to_intersection(node,tls_dict,edge_dict)
+        intersection = node_to_intersection(node, tls_dict, edge_dict)
         if intersection["roads"] != []:
             final_intersections.append(intersection)
 
     return final_intersections
+
 
 def get_final_roads(net):
     edges = net.getEdges()
@@ -496,10 +498,9 @@ def get_final_roads(net):
     return final_roads
 
 
-
 def main(args):
-    print("Converting sumo net file",args.sumonet)
-    net = sumolib.net.readNet(os.path.join(os.getcwd(),args.sumonet), withPrograms=True)
+    print("Converting sumo net file", args.sumonet)
+    net = sumolib.net.readNet(os.path.join(os.getcwd(), args.sumonet), withPrograms=True)
 
     for edge in net.getEdges():
         process_edge(edge)
@@ -507,12 +508,12 @@ def main(args):
     tls_dict = {}
     for tls in net.getTrafficLights():
         tls_dict[tls.getID()] = tls
-    print('Start processing '+str(len(tls_dict))+" traffic lights")
+    print('Start processing ' + str(len(tls_dict)) + " traffic lights")
     edge_dict = {}
     for edge_ in net.getEdges():
         edge_dict[edge_.getID()] = edge_._lanes
 
-    final_intersections = get_final_intersections(net,tls_dict,edge_dict)
+    final_intersections = get_final_intersections(net, tls_dict, edge_dict)
 
     for intersection in final_intersections:
         if intersection['virtual']:
@@ -535,8 +536,6 @@ if __name__ == '__main__':
 
     main(args)
     print("Cityflow net file generated successfully!")
-    
-
 
 '''
 
