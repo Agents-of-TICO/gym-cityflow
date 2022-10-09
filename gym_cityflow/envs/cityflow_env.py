@@ -14,6 +14,7 @@ class CityFlowEnv(gym.Env):
 
         # open cityflow config file into dict
         self.configDict = json.load(open(config_path))
+        self.interval = self.configDict['interval']
         # open cityflow roadnet file into dict
         self.roadnetDict = json.load(open(self.configDict['dir'] + self.configDict['roadnetFile']))
         self.flowDict = json.load(open(self.configDict['dir'] + self.configDict['flowFile']))
@@ -91,7 +92,7 @@ class CityFlowEnv(gym.Env):
         self.current_step += 1
 
         # add current wait time to total
-        self.total_wait_time += sum(self.eng.get_lane_waiting_vehicle_count().values())
+        self.total_wait_time += sum(self.eng.get_lane_waiting_vehicle_count().values())*self.interval
 
         # An episode is done once we have simulated the number of steps defined in episode_steps
         terminated = self.episode_steps == self.current_step
