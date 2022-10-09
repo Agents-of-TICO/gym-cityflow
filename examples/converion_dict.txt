@@ -1,7 +1,0 @@
-dict = {
-	"intersection_1_0": "5930291671",
-	"intersection_0_1": "176088011",
-	"intersection_1_1": "176088017",
-	"intersection_2_1": "2823784462",
-	"intersection_1_2": "176091857",	
-}
