@@ -1,4 +1,4 @@
-# Converter
+	# Converter
 
 This converter was copied from [X3nOph0N's CityFlow repository](https://github.com/X3nOph0N/CityFlow) as they have implemented fixes so the converter works with the new versions of SUMO.
 
@@ -9,7 +9,7 @@ The following code converts a sumo roadnet file, atlanta.net.xml, to CityFlow fo
 *Example roadnet and flow files can be downloaded [here](https://github.com/cityflow-project/data/tree/master/tools/Converter/examples)*
 
 ```
-python converter.py --sumonet atlanta_sumo.net.xml --cityflownet atlanta_cityflow.json
+python converter.py --sumonet atlanta_sumo.net.xml --roadnet atlanta_cityflow.json
 ```
 
 SUMO roadnet and transformed CityFlow roadnet
