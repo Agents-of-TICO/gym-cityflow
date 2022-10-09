@@ -5,7 +5,9 @@ import os
 import random
 
 env = gym.make(
-    "cityflow-v0", configPath="sample_data/sample_config_2.json", episodeSteps=3600
+    "cityflow-v0",
+    config_path="sample_data/sample_config_2.json",
+    episode_steps=3600
 )
 
 # Check action space

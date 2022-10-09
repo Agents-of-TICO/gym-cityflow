@@ -1,232 +1,116 @@
-import json
-import cityflow
 import gym
-import numpy as np
-from gym import error, spaces, utils
-from gym.utils import seeding
+from gym import spaces
+import cityflow
+import json
 
-class Cityflow(gym.Env):
-    metadata = {'render.modes': ['human']}
 
-    def __init__(self, configPath, episodeSteps):
-        #steps per episode
-        self.steps_per_episode = episodeSteps
-        self.is_done = False
+class CityFlowEnv(gym.Env):
+    metadata = {"render_modes": ["human", "rgb_array"], "max_waiting": 64}
+
+    def __init__(self, config_path, episode_steps=10000, num_threads=1, render_mode=None):
+        self.episode_steps = episode_steps  # The number of steps to simulate
         self.current_step = 0
+        self.total_wait_time = 0
 
-        #open cityflow config file into dict
-        self.configDict = json.load(open(configPath))
-        #open cityflow roadnet file into dict
+        # open cityflow config file into dict
+        self.configDict = json.load(open(config_path))
+        self.interval = self.configDict['interval']
+        # open cityflow roadnet file into dict
         self.roadnetDict = json.load(open(self.configDict['dir'] + self.configDict['roadnetFile']))
         self.flowDict = json.load(open(self.configDict['dir'] + self.configDict['flowFile']))
 
-        # create dict of controllable intersections and number of light phases
-        self.intersections = {}
-        for i in range(len(self.roadnetDict['intersections'])):
-            # check if intersection is controllable
-            if self.roadnetDict['intersections'][i]['virtual'] == False:
-                # for each roadLink in intersection store incoming lanes, outgoing lanes and direction in lists
-                incomingLanes = []
-                outgoingLanes = []
-                directions = []
-                for j in range(len(self.roadnetDict['intersections'][i]['roadLinks'])):
-                    incomingRoads = []
-                    outgoingRoads = []
-                    directions.append(self.roadnetDict['intersections'][i]['roadLinks'][j]['direction'])
-                    for k in range(len(self.roadnetDict['intersections'][i]['roadLinks'][j]['laneLinks'])):
-                        incomingRoads.append(self.roadnetDict['intersections'][i]['roadLinks'][j]['startRoad'] + 
-                                            '_' + 
-                                            str(self.roadnetDict['intersections'][i]['roadLinks'][j]['laneLinks'][k]['startLaneIndex']))
-                        outgoingRoads.append(self.roadnetDict['intersections'][i]['roadLinks'][j]['endRoad'] + 
-                                            '_' + 
-                                            str(self.roadnetDict['intersections'][i]['roadLinks'][j]['laneLinks'][k]['endLaneIndex']))
-                    incomingLanes.append(incomingRoads)
-                    outgoingLanes.append(outgoingRoads)
+        # Get list of non-virtual intersections
+        intersections = list(filter(lambda val: not val['virtual'], self.roadnetDict['intersections']))
 
-                # add intersection to dict where key = intersection_id
-                # value = no of lightPhases, incoming lane names, outgoing lane names, directions for each lane group
-                self.intersections[self.roadnetDict['intersections'][i]['id']] = [
-                                                                                  [len(self.roadnetDict['intersections'][i]['trafficLight']['lightphases'])],
-                                                                                  incomingLanes,
-                                                                                  outgoingLanes,
-                                                                                  directions
-                                                                                 ]
-
-        #setup intersectionNames list for agent actions
-        self.intersectionNames = []
-        for key in self.intersections:
-            self.intersectionNames.append(key)
-
-        #define action space MultiDiscrete()
-        actionSpaceArray = []
-        for key in self.intersections:
-            actionSpaceArray.append(self.intersections[key][0][0])
-        self.action_space = spaces.MultiDiscrete(actionSpaceArray)
-
-        # define observation space
-        observationSpaceDict = {}
-        for key in self.intersections:
-            totalCount = 0
-            for i in range(len(self.intersections[key][1])):
-                totalCount += len(self.intersections[key][1][i])
-
-            intersectionObservation = []
-            maxVehicles = len(self.flowDict)
-            for i in range(totalCount):
-                intersectionObservation.append([maxVehicles, maxVehicles])
-
-            observationSpaceDict[key] = spaces.MultiDiscrete(intersectionObservation)
-        self.observation_space = spaces.Dict(observationSpaceDict)
+        # Get number of available phases available in each intersection and use it to create the action
+        # space since each intersection has a number of actions equal to the number of states/phases the
+        # intersection has. Here we also generate a dictionary to get the id of an intersection given an index
+        intersection_phases = [None]*len(intersections)
+        index_to_intersection_id = {}
+        for i, intersection in enumerate(intersections):
+            intersection_phases[i] = len(intersection['trafficLight']['lightphases'])
+            index_to_intersection_id[i] = intersection['id']
+        self.action_space = spaces.MultiDiscrete(intersection_phases)
+        self._index_to_intersection_id = index_to_intersection_id
 
         # create cityflow engine
-        self.eng = cityflow.Engine(configPath, thread_num=1)  
+        self.eng = cityflow.Engine(config_path, thread_num=num_threads)
 
-        #Waiting dict for reward function
-        self.waiting_vehicles_reward = {}
+        # Observations are dictionaries containing the number of waiting vehicles in each lane in the simulation.
+        # Maximum number of waiting vehicles in each lane is defined by the "max_waiting" metadata parameter
+        observation_space_dict = self.eng.get_lane_waiting_vehicle_count()
+        for key in observation_space_dict:
+            observation_space_dict[key] = spaces.Discrete(self.metadata["max_waiting"])
+        self.observation_space = spaces.Dict(observation_space_dict)
+
+        assert render_mode is None or render_mode in self.metadata["render_modes"]
+        self.render_mode = render_mode
+
+    def _get_obs(self):
+        return self.eng.get_lane_waiting_vehicle_count()
+
+    def _get_info(self):
+        return {}
+
+    def _get_reward(self):
+        num_waiting = sum(self.eng.get_lane_waiting_vehicle_count().values())
+        return 1 / (num_waiting + 1)
+
+    def reset(self, seed=None, options=None):
+        # We need the following line to seed self.np_random
+        # super().reset(seed=seed)
+
+        print("Total wait time: " + str(self.total_wait_time))
+
+        if seed is not None:
+            self.eng.set_random_seed(seed)
+        self.eng.reset(seed=False)
+        self.current_step = 0
+        self.total_wait_time = 0
+
+        observation = self.eng.get_lane_waiting_vehicle_count()
+        info = self._get_info()
+
+        if self.render_mode == "human":
+            self.render()
+
+        return observation
 
     def step(self, action):
-        #Check that input action size is equal to number of intersections
-        if len(action) != len(self.intersectionNames):
+        # Check that input action size is equal to number of intersections
+        if len(action) != len(self._index_to_intersection_id):
             raise Warning('Action length not equal to number of intersections')
 
-        #Set each trafficlight phase to specified action
-        for i in range(len(self.intersectionNames)):
-            self.eng.set_tl_phase(self.intersectionNames[i], action[i])
+        # Set each traffic light phase to specified action
+        for i, phase in enumerate(action):
+            self.eng.set_tl_phase(self._index_to_intersection_id[i], phase)
 
-        #env step
+        # Step the CityFlow env
         self.eng.next_step()
-        #observation
-        self.observation = self._get_observation()
 
-        #reward
-        self.reward = self.getReward()
-        #Detect if Simulation is finshed for done variable
+        # increment the step counter
         self.current_step += 1
 
-        if self.current_step + 1 == self.steps_per_episode:
-            self.is_done = True
+        # add current wait time to total
+        self.total_wait_time += sum(self.eng.get_lane_waiting_vehicle_count().values())*self.interval
 
-        #return observation, reward, done, info
-        return self.observation, self.reward, self.is_done, {}
+        # An episode is done once we have simulated the number of steps defined in episode_steps
+        terminated = self.episode_steps == self.current_step
+        reward = self._get_reward()
+        observation = self._get_obs()
+        info = self._get_info()
 
-    def reset(self):
-        self.eng.reset(seed=False)
-        self.is_done = False
-        self.current_step = 0
-        return self._get_observation()
+        if self.render_mode == "human":
+            self.render()
 
-    def render(self, mode='human'):
-        print("Current time: " + self.cityflow.get_current_time())
+        return observation, reward, terminated, info
 
-    def _get_observation(self):
-        #observation
-        #get arrays of waiting cars on input lane vs waiting cars on output lane for each intersection
-        self.lane_waiting_vehicles_dict = self.eng.get_lane_waiting_vehicle_count()
-        self.observation = {}
-        for key in self.intersections:
-            waitingIntersection=[]
-            for i in range(len(self.intersections[key][1])):
-                for j in range(len(self.intersections[key][1][i])):
-                    waitingIntersection.append([self.lane_waiting_vehicles_dict[self.intersections[key][1][i][j]], 
-                           self.lane_waiting_vehicles_dict[self.intersections[key][2][i][j]]])
-            self.observation[key] = waitingIntersection
+    def render(self):
+        # Function called to render environment
+        print("Current time: " + str(self.eng.get_current_time()))
+        print("Running Total wait time: " + str(self.total_wait_time))
 
-        return self.observation
-
-    def getReward(self):
-        reward = []
-        self.vehicle_speeds = self.eng.get_vehicle_speed()
-        self.lane_vehicles = self.eng.get_lane_vehicles()
-
-        #list of waiting vehicles
-        waitingVehicles = []
-        reward = []
-
-        #for intersection in dict retrieve names of waiting vehicles
-        for key in self.intersections:
-            for i in range(len(self.intersections[key][1])):
-                #reward val
-                intersectionReward = 0
-                for j in range(len(self.intersections[key][1][i])):
-                    vehicle = self.lane_vehicles[self.intersections[key][1][i][j]]
-                    #if lane is empty continue
-                    if len(vehicle) == 0:
-                            continue
-                    for k in range(len(vehicle)):
-                        #If vehicle is waiting check for it in dict
-                        if self.vehicle_speeds[vehicle[k]] < 0.1:
-                            waitingVehicles.append(vehicle[k])
-                            if vehicle[k] not in self.waiting_vehicles_reward:
-                                self.waiting_vehicles_reward[vehicle[k]] = 1
-                            else:
-                                self.waiting_vehicles_reward[vehicle[k]] += 1
-                            #calculate reward for intersection, cap value to -2e+200
-                            if intersectionReward > -1e+200:
-                                if self.waiting_vehicles_reward[vehicle[k]] < 460:
-                                    intersectionReward += -np.exp(self.waiting_vehicles_reward[vehicle[k]])
-                                else:
-                                    intersectionReward += -1e-200
-                            else:
-                                intersectionReward = -1e+200
-            reward.append([key, intersectionReward])
-
-        waitingVehiclesRemove = []
-        for key in self.waiting_vehicles_reward:
-            if key in waitingVehicles:
-                continue
-            else:
-                waitingVehiclesRemove.append(key)
-
-        for item in waitingVehiclesRemove:
-            self.waiting_vehicles_reward.pop(item)
-        
-        return reward
-
-    def getReward_nonExp(self):
-        reward = []
-        self.vehicle_speeds = self.eng.get_vehicle_speed()
-        self.lane_vehicles = self.eng.get_lane_vehicles()
-
-         #list of waiting vehicles
-        waitingVehicles = []
-        reward = []
-
-        #for intersection in dict retrieve names of waiting vehicles
-        for key in self.intersections:
-            for i in range(len(self.intersections[key][1])):
-                #reward val
-                intersectionReward = 0
-                for j in range(len(self.intersections[key][1][i])):
-                    vehicle = self.lane_vehicles[self.intersections[key][1][i][j]]
-                    #if lane is empty continue
-                    if len(vehicle) == 0:
-                            continue
-                    for k in range(len(vehicle)):
-                        #If vehicle is waiting check for it in dict
-                        if self.vehicle_speeds[vehicle[k]] < 0.1:
-                            waitingVehicles.append(vehicle[k])
-                            if vehicle[k] not in self.waiting_vehicles_reward:
-                                self.waiting_vehicles_reward[vehicle[k]] = 1
-                            else:
-                                self.waiting_vehicles_reward[vehicle[k]] += 1
-                            #calculate reward for intersection, cap value to -2e+200
-                            if intersectionReward > -1e+200:
-                                intersectionReward += -(self.waiting_vehicles_reward[vehicle[k]])
-                            else:
-                                intersectionReward = -1e+200
-            reward.append([key, intersectionReward])
-
-        waitingVehiclesRemove = []
-        for key in self.waiting_vehicles_reward:
-            if key in waitingVehicles:
-                continue
-            else:
-                waitingVehiclesRemove.append(key)
-
-        for item in waitingVehiclesRemove:
-            self.waiting_vehicles_reward.pop(item)
-        
-        return reward
-
-    def seed(self, seed=None):
-        self.eng.set_random_seed(seed)
+    def close(self):
+        # if we need to do anything on env exit this is where we do it
+        print("Exiting...")
+        print("Total wait time: " + str(self.total_wait_time))
