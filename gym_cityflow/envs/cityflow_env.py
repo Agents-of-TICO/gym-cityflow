@@ -69,7 +69,7 @@ class CityFlowEnv(gym.Env):
         if self.render_mode == "human":
             self._render_frame()
 
-        return observation, info
+        return observation
 
     def step(self, action):
         # Check that input action size is equal to number of intersections
@@ -95,7 +95,7 @@ class CityFlowEnv(gym.Env):
         if self.render_mode == "human":
             self.render()
 
-        return observation, reward, terminated, False, info
+        return observation, reward, terminated, info
 
     def render(self):
         # Function called to render environment
