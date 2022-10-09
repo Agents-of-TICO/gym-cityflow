@@ -106,7 +106,7 @@ class CityFlowEnv(gym.Env):
 
     def render(self):
         # Function called to render environment
-        print("Current time: " + self.eng.get_current_time())
+        print("Current time: " + str(self.eng.get_current_time()))
         print("Running Total wait time: " + str(self.total_wait_time))
 
     def close(self):
