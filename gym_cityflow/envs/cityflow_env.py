@@ -10,6 +10,7 @@ class CityFlowEnv(gym.Env):
     def __init__(self, config_path, episode_steps=10000, num_threads=1, render_mode=None):
         self.episode_steps = episode_steps  # The number of steps to simulate
         self.current_step = 0
+        self.total_wait_time = 0
 
         # open cityflow config file into dict
         self.configDict = json.load(open(config_path))
@@ -58,6 +59,8 @@ class CityFlowEnv(gym.Env):
         # We need the following line to seed self.np_random
         # super().reset(seed=seed)
 
+        print("Total wait time: " + str(self.total_wait_time))
+
         if seed is not None:
             self.eng.set_random_seed(seed)
         self.eng.reset(seed=False)
@@ -67,7 +70,7 @@ class CityFlowEnv(gym.Env):
         info = self._get_info()
 
         if self.render_mode == "human":
-            self._render_frame()
+            self.render()
 
         return observation
 
@@ -86,6 +89,9 @@ class CityFlowEnv(gym.Env):
         # increment the step counter
         self.current_step += 1
 
+        # add current wait time to total
+        self.total_wait_time = sum(self.eng.get_lane_waiting_vehicle_count().values())
+
         # An episode is done once we have simulated the number of steps defined in episode_steps
         terminated = self.episode_steps == self.current_step
         reward = self._get_reward()
@@ -100,7 +106,9 @@ class CityFlowEnv(gym.Env):
     def render(self):
         # Function called to render environment
         print("Current time: " + self.cityflow.get_current_time())
+        print("Running Total wait time: " + str(self.total_wait_time))
 
     def close(self):
         # if we need to do anything on env exit this is where we do it
-        print("Exiting")
+        print("Exiting...")
+        print("Total wait time: " + str(self.total_wait_time))
