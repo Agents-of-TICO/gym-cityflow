@@ -4,7 +4,7 @@ import cityflow
 import json
 
 
-class GridWorldEnv(gym.Env):
+class CityFlowEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "max_waiting": 64}
 
     def __init__(self, config_path, episode_steps=10000, num_threads=1, render_mode=None):
@@ -17,22 +17,13 @@ class GridWorldEnv(gym.Env):
         self.roadnetDict = json.load(open(self.configDict['dir'] + self.configDict['roadnetFile']))
         self.flowDict = json.load(open(self.configDict['dir'] + self.configDict['flowFile']))
 
-        # Observations are dictionaries with the agent's and the target's location.
-        # Each location is encoded as an element of {0, ..., `size`}^2, i.e. MultiDiscrete([size, size]).
-        self.observation_space = spaces.Dict(
-            {
-                "agent": spaces.Box(0, size - 1, shape=(2,), dtype=int),
-                "target": spaces.Box(0, size - 1, shape=(2,), dtype=int),
-            }
-        )
-
         # Get list of non-virtual intersections
         intersections = list(filter(lambda val: not val['virtual'], self.roadnetDict['intersections']))
 
         # Get number of available phases available in each intersection and use it to create the action
         # space since each intersection has a number of actions equal to the number of states/phases the
         # intersection has. Here we also generate a dictionary to get the id of an intersection given an index
-        intersection_phases = [len(intersections)]
+        intersection_phases = [None]*len(intersections)
         index_to_intersection_id = {}
         for i, intersection in enumerate(intersections):
             intersection_phases[i] = len(intersection['trafficLight']['lightphases'])
@@ -60,19 +51,19 @@ class GridWorldEnv(gym.Env):
         return {}
 
     def _get_reward(self):
-        num_waiting = sum(self.eng.get_lane_waiting_vehicle_count.values())
+        num_waiting = sum(self.eng.get_lane_waiting_vehicle_count().values())
         return 1 / (num_waiting + 1)
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
-        super().reset(seed=seed)
+        # super().reset(seed=seed)
 
         if seed is not None:
             self.eng.set_random_seed(seed)
         self.eng.reset(seed=False)
         self.current_step = 0
 
-        observation = self._get_obs()
+        observation = self.eng.get_lane_waiting_vehicle_count()
         info = self._get_info()
 
         if self.render_mode == "human":
