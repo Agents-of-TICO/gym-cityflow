@@ -1,25 +1,21 @@
 import gym
 from gym import spaces
-import numpy as np
 import cityflow
 import json
 
 
-test = spaces.Discrete(2)
-
-test.add()
-
-
 class GridWorldEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
+    metadata = {"render_modes": ["human", "rgb_array"], "max_waiting": 64}
 
-    def __init__(self, config_path, num_steps=10000, render_mode=None):
+    def __init__(self, config_path, episode_steps=10000, num_threads=1, render_mode=None):
+        self.episode_steps = episode_steps  # The number of steps to simulate
+        self.current_step = 0
+
         # open cityflow config file into dict
         self.configDict = json.load(open(config_path))
         # open cityflow roadnet file into dict
         self.roadnetDict = json.load(open(self.configDict['dir'] + self.configDict['roadnetFile']))
         self.flowDict = json.load(open(self.configDict['dir'] + self.configDict['flowFile']))
-        self.size = size  # The size of the square grid
 
         # Observations are dictionaries with the agent's and the target's location.
         # Each location is encoded as an element of {0, ..., `size`}^2, i.e. MultiDiscrete([size, size]).
@@ -33,83 +29,48 @@ class GridWorldEnv(gym.Env):
         # Get list of non-virtual intersections
         intersections = list(filter(lambda val: not val['virtual'], self.roadnetDict['intersections']))
 
-        # Get number of available phases in each intersection.
+        # Get number of available phases available in each intersection and use it to create the action
+        # space since each intersection has a number of actions equal to the number of states/phases the
+        # intersection has. Here we also generate a dictionary to get the id of an intersection given an index
         intersection_phases = [len(intersections)]
+        index_to_intersection_id = {}
         for i, intersection in enumerate(intersections):
             intersection_phases[i] = len(intersection['trafficLight']['lightphases'])
+            index_to_intersection_id[i] = intersection['id']
+        self.action_space = spaces.MultiDiscrete(intersection_phases)
+        self._index_to_intersection_id = index_to_intersection_id
 
-        # Observations are multidimensional arrays containing the number of waiting vehicles in each lane
-        # for each intersection. Each lane can have at most 64 vehicles waiting, so an observation can be
-        # encoded
-        self.observation_space = spaces.Dict(
-            {
-                "intersection_1": spaces.Dict(
-                    {
-                        "phase": spaces.Box(0, num_phases - 1, shape=(1,), dtype=int),
-                        "north": spaces.Discrete(num_lanes_n),
-                        "south": spaces.Discrete(num_lanes_s),
-                        "east": spaces.Discrete(num_lanes_e),
-                        "west": spaces.Discrete(num_lanes_w)
-                    }
-                ),
-                "intersection_2": spaces.Box(0, size - 1, shape=(2,), dtype=int),
-            }
-        )
+        # create cityflow engine
+        self.eng = cityflow.Engine(config_path, thread_num=num_threads)
 
-        # Each intersection has a number of actions equal to the number of states/phases the intersection has
-        arr = []
-        for intersection in intersections:
-            arr.append(intersection.num_phases)
-        self.action_space = spaces.MultiDiscrete(arr)
-
-        """
-        The following dictionary maps abstract actions from `self.action_space` to 
-        the direction we will walk in if that action is taken.
-        I.e. 0 corresponds to "right", 1 to "up" etc.
-        """
-        self._action_to_direction = {
-            0: np.array([1, 0]),
-            1: np.array([0, 1]),
-            2: np.array([-1, 0]),
-            3: np.array([0, -1]),
-        }
+        # Observations are dictionaries containing the number of waiting vehicles in each lane in the simulation.
+        # Maximum number of waiting vehicles in each lane is defined by the "max_waiting" metadata parameter
+        observation_space_dict = self.eng.get_lane_waiting_vehicle_count()
+        for key in observation_space_dict:
+            observation_space_dict[key] = spaces.Discrete(self.metadata["max_waiting"])
+        self.observation_space = spaces.Dict(observation_space_dict)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
 
-        """
-        If human-rendering is used, `self.window` will be a reference
-        to the window that we draw to. `self.clock` will be a clock that is used
-        to ensure that the environment is rendered at the correct framerate in
-        human-mode. They will remain `None` until human-mode is used for the
-        first time.
-        """
-        self.window = None
-        self.clock = None
-
     def _get_obs(self):
-        return {"agent": self._agent_location, "target": self._target_location}
+        return self.eng.get_lane_waiting_vehicle_count()
 
     def _get_info(self):
-        return {
-            "distance": np.linalg.norm(
-                self._agent_location - self._target_location, ord=1
-            )
-        }
+        return {}
+
+    def _get_reward(self):
+        num_waiting = sum(self.eng.get_lane_waiting_vehicle_count.values())
+        return 1 / (num_waiting + 1)
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
 
-        # Choose the agent's location uniformly at random
-        self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
-
-        # We will sample the target's location randomly until it does not coincide with the agent's location
-        self._target_location = self._agent_location
-        while np.array_equal(self._target_location, self._agent_location):
-            self._target_location = self.np_random.integers(
-                0, self.size, size=2, dtype=int
-            )
+        if seed is not None:
+            self.eng.set_random_seed(seed)
+        self.eng.reset(seed=False)
+        self.current_step = 0
 
         observation = self._get_obs()
         info = self._get_info()
@@ -120,27 +81,34 @@ class GridWorldEnv(gym.Env):
         return observation, info
 
     def step(self, action):
-        # Map the action (element of {0,1,2,3}) to the direction we walk in
-        direction = self._action_to_direction[action]
-        # We use `np.clip` to make sure we don't leave the grid
-        self._agent_location = np.clip(
-            self._agent_location + direction, 0, self.size - 1
-        )
-        # An episode is done iff the agent has reached the target
-        terminated = np.array_equal(self._agent_location, self._target_location)
-        reward = 1 if terminated else 0  # Binary sparse rewards
+        # Check that input action size is equal to number of intersections
+        if len(action) != len(self._index_to_intersection_id):
+            raise Warning('Action length not equal to number of intersections')
+
+        # Set each traffic light phase to specified action
+        for i, phase in enumerate(action):
+            self.eng.set_tl_phase(self._index_to_intersection_id[i], phase)
+
+        # Step the CityFlow env
+        self.eng.next_step()
+
+        # increment the step counter
+        self.current_step += 1
+
+        # An episode is done once we have simulated the number of steps defined in episode_steps
+        terminated = self.episode_steps == self.current_step
+        reward = self._get_reward()
         observation = self._get_obs()
         info = self._get_info()
 
         if self.render_mode == "human":
-            self._render_frame()
+            self.render()
 
         return observation, reward, terminated, False, info
 
     def render(self):
         # Function called to render environment
-        if self.render_mode == "human":
-            print("Rendering")
+        print("Current time: " + self.cityflow.get_current_time())
 
     def close(self):
         # if we need to do anything on env exit this is where we do it

@@ -4,7 +4,7 @@ from gym.utils.env_checker import check_env
 
 env = gym.make(
     "cityflow-v0",
-    config_path="sample_data/sample_config.json",
+    config_path="examples/config2.json",
     episode_steps=3600,
 )
 
