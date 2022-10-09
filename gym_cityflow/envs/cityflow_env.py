@@ -65,6 +65,7 @@ class CityFlowEnv(gym.Env):
             self.eng.set_random_seed(seed)
         self.eng.reset(seed=False)
         self.current_step = 0
+        self.total_wait_time = 0
 
         observation = self.eng.get_lane_waiting_vehicle_count()
         info = self._get_info()
