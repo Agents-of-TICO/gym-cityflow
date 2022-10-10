@@ -1,14 +1,20 @@
 # gym-cityflow
 
 `gym_cityflow` is a custom OpenAI gym environment designed to handle any cityflow config file.
+This is a fork of the original `gym_cityflow` environment by [MaxVanDijck](https://github.com/MaxVanDijck/gym-cityflow)
+and has been updated to work with current versions of OpenAI Gym (v0.21.0).
 
 ## Prerequisites
-OpenAI Gym: https://gym.openai.com/docs/
-CityFlow: https://cityflow.readthedocs.io/en/latest/install.html
+
+As an OpenAI Gym environment that implements the CityFlow simulation engine the following 
+prerequisites are required to use this environment.
+
+- [OpenAI Gym](https://www.gymlibrary.dev/)
+- [CityFlow](https://cityflow.readthedocs.io/en/latest/install.html)
 
 ## Installation
 
-`gym_cityflow` can be installed by running the following at the root directory of the repository:
+`gym_cityflow` is currently not a part of any package can be installed by running the following at the root directory of the repository:
 
 `pip install -e .`
 
