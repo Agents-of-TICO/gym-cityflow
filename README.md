@@ -3,6 +3,7 @@
 `gym_cityflow` is a custom OpenAI gym environment designed to handle any cityflow config file.
 This is a fork of the original `gym_cityflow` environment by [MaxVanDijck](https://github.com/MaxVanDijck/gym-cityflow)
 and has been updated to work with current versions of OpenAI Gym (v0.21.0).
+This is version is for implementation of a Multi-Agent DQN
 
 ## Prerequisites
 
