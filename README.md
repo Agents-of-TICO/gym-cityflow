@@ -12,6 +12,9 @@ prerequisites are required to use this environment.
 - [OpenAI Gym](https://www.gymlibrary.dev/)
 - [CityFlow](https://cityflow.readthedocs.io/en/latest/install.html)
 
+Unfortunately, as CityFlow is not registered with a python package index you need to clone the repository
+and install the package using the 'pip install -e .' command from the root directory of the repository.
+
 ## Installation
 
 `gym_cityflow` is currently not a part of any package must be manually installed by running the following 
@@ -69,3 +72,6 @@ for i in range(1000):
 
 env.close()
 ```
+
+For convenience, we have added some example CityFlow config.json, roadnet.json, and flow.json files 
+to 'examples/default' and 'examples/double_intersection'.
