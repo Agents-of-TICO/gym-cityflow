@@ -70,7 +70,6 @@ class CityFlowEnv(gym.Env):
         # reward picking the same phase multiple times and punish simulation for changing phases too quickly
         for i in range(len(action)):
             if self.last_action[i] == action[i]:
-                print(f"steps since change: {self.steps_since_phase_change[i]}")
                 reward += self.min_phase_time / self.steps_since_phase_change[i]
             elif self.steps_since_phase_change[i] < self.min_phase_time:
                 reward -= (self.min_phase_time + 1) / (self.steps_since_phase_change[i] + 1)
