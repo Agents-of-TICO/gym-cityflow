@@ -11,8 +11,6 @@ class CityFlowEnv(gym.Env):
         self.episode_steps = episode_steps  # The number of steps to simulate
         self.current_step = 0
         self.total_wait_time = 0
-        self.steps_since_phase_change = []
-        self.last_action = []
         self.reward_range = (-float("inf"), float(1))
 
         # open cityflow config file into dict
@@ -29,6 +27,8 @@ class CityFlowEnv(gym.Env):
         # space since each intersection has a number of actions equal to the number of states/phases the
         # intersection has. Here we also generate a dictionary to get the id of an intersection given an index
         intersection_phases = [None]*len(intersections)
+        self.steps_since_phase_change = [None]*len(intersections)
+        self.last_action = [None]*len(intersections)
         index_to_intersection_id = {}
         for i, intersection in enumerate(intersections):
             intersection_phases[i] = len(intersection['trafficLight']['lightphases'])
@@ -63,7 +63,7 @@ class CityFlowEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
-        # super().reset(seed=seed)
+        super().reset(seed=seed)
 
         print("Total wait time: " + str(self.total_wait_time))
 
@@ -72,7 +72,7 @@ class CityFlowEnv(gym.Env):
         self.eng.reset(seed=False)
         self.current_step = 0
         self.total_wait_time = 0
-        for i in len(self.steps_since_phase_change):
+        for i in range(len(self.steps_since_phase_change)):
             self.steps_since_phase_change[i] = 0
             self.last_action[i] = -1
 
@@ -82,7 +82,7 @@ class CityFlowEnv(gym.Env):
         if self.render_mode == "human":
             self.render()
 
-        return observation
+        return observation, info
 
     def step(self, action):
         # Check that input action size is equal to number of intersections
@@ -116,7 +116,7 @@ class CityFlowEnv(gym.Env):
         if self.render_mode == "human":
             self.render()
 
-        return observation, reward, terminated, info
+        return observation, reward, terminated, False, info
 
     def render(self):
         # Function called to render environment
