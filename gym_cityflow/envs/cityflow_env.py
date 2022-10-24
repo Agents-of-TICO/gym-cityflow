@@ -34,7 +34,7 @@ class CityFlowEnv(gym.Env):
             intersection_phases[i] = len(intersection['trafficLight']['lightphases'])
             index_to_intersection_id[i] = intersection['id']
             self.steps_since_phase_change[i] = 0
-            self.last_action[i] = -1
+            self.last_action[i] = 0
         self.action_space = spaces.MultiDiscrete(intersection_phases)
         self._index_to_intersection_id = index_to_intersection_id
 
@@ -76,7 +76,7 @@ class CityFlowEnv(gym.Env):
         self.total_wait_time = 0
         for i in range(len(self.steps_since_phase_change)):
             self.steps_since_phase_change[i] = 0
-            self.last_action[i] = -1
+            self.last_action[i] = 0
 
         observation = self.eng.get_lane_waiting_vehicle_count()
         info = self._get_info()
@@ -95,7 +95,7 @@ class CityFlowEnv(gym.Env):
         # Set each traffic light phase to specified action
         for i, phase in enumerate(action):
             self.eng.set_tl_phase(self._index_to_intersection_id[i], phase)
-            if self.last_action[i] == -1 or self.last_action[i] == phase:
+            if self.last_action[i] == phase:
                 self.steps_since_phase_change[i] += 1
             else:
                 self.steps_since_phase_change[i] = 0
