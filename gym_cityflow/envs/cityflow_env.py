@@ -82,7 +82,8 @@ class CityFlowEnv(gym.Env):
         super().reset(seed=seed)
 
         print("Total wait time: " + str(self.total_wait_time))
-        print(f"Average phase time: {mean(self.phase_times)} seconds")
+        if len(self.phase_times) > 0:
+            print(f"Average phase time: {mean(self.phase_times)} seconds")
 
         if seed is not None:
             self.eng.set_random_seed(seed)
