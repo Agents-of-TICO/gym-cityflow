@@ -11,7 +11,7 @@ class CityFlowEnv(gym.Env):
         self.episode_steps = episode_steps  # The number of steps to simulate
         self.current_step = 0
         self.total_wait_time = 0
-        # self.reward_range = (-float("inf"), float(1))
+        self.reward_range = (-float("inf"), float(1))
 
         # open cityflow config file into dict
         self.configDict = json.load(open(config_path))
@@ -82,7 +82,8 @@ class CityFlowEnv(gym.Env):
         if self.render_mode == "human":
             self.render()
 
-        return observation, info
+        # The Newest version of gym has info returned w/ reset but this causes issues with stable baselines 3
+        return observation # , info
 
     def step(self, action):
         # Check that input action size is equal to number of intersections
