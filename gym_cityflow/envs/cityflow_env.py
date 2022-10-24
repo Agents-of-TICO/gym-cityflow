@@ -55,7 +55,9 @@ class CityFlowEnv(gym.Env):
         return self.eng.get_lane_waiting_vehicle_count()
 
     def _get_info(self):
-        return {"steps_since_phase_change": self.steps_since_phase_change}
+        return {"steps_since_phase_change": self.steps_since_phase_change,
+                "last_action": self.last_action
+                }
 
     def _get_reward(self):
         num_waiting = sum(self.eng.get_lane_waiting_vehicle_count().values())
@@ -97,6 +99,7 @@ class CityFlowEnv(gym.Env):
                 self.steps_since_phase_change[i] += 1
             else:
                 self.steps_since_phase_change[i] = 0
+                self.last_action[i] = phase
 
 
         # Step the CityFlow env
