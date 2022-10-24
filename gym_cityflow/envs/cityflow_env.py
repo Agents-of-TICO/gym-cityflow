@@ -99,8 +99,6 @@ class CityFlowEnv(gym.Env):
                 self.steps_since_phase_change[i] += 1
             else:
                 self.steps_since_phase_change[i] = 0
-                self.last_action[i] = phase
-
 
         # Step the CityFlow env
         self.eng.next_step()
@@ -117,6 +115,9 @@ class CityFlowEnv(gym.Env):
         observation = self._get_obs()
         info = self._get_info()
         truncated = False
+
+        # Update last action taken
+        self.last_action = action
 
         if self.render_mode == "human":
             self.render()
