@@ -13,7 +13,7 @@ class CityFlowEnv(gym.Env):
         self.total_wait_time = 0
         self.steps_since_phase_change = []
         self.last_action = []
-        self.reward_range = (float(0), float(1))
+        self.reward_range = (-float("inf"), float(1))
 
         # open cityflow config file into dict
         self.configDict = json.load(open(config_path))
