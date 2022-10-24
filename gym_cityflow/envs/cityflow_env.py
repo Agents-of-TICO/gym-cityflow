@@ -11,6 +11,9 @@ class CityFlowEnv(gym.Env):
         self.episode_steps = episode_steps  # The number of steps to simulate
         self.current_step = 0
         self.total_wait_time = 0
+        self.steps_since_phase_change = []
+        self.last_action = []
+        self.reward_range = (float(0), float(1))
 
         # open cityflow config file into dict
         self.configDict = json.load(open(config_path))
@@ -30,6 +33,8 @@ class CityFlowEnv(gym.Env):
         for i, intersection in enumerate(intersections):
             intersection_phases[i] = len(intersection['trafficLight']['lightphases'])
             index_to_intersection_id[i] = intersection['id']
+            self.steps_since_phase_change[i] = 0
+            self.last_action[i] = -1
         self.action_space = spaces.MultiDiscrete(intersection_phases)
         self._index_to_intersection_id = index_to_intersection_id
 
@@ -50,7 +55,7 @@ class CityFlowEnv(gym.Env):
         return self.eng.get_lane_waiting_vehicle_count()
 
     def _get_info(self):
-        return {}
+        return {"steps_since_phase_change": self.steps_since_phase_change}
 
     def _get_reward(self):
         num_waiting = sum(self.eng.get_lane_waiting_vehicle_count().values())
@@ -67,6 +72,9 @@ class CityFlowEnv(gym.Env):
         self.eng.reset(seed=False)
         self.current_step = 0
         self.total_wait_time = 0
+        for i in len(self.steps_since_phase_change):
+            self.steps_since_phase_change[i] = 0
+            self.last_action[i] = -1
 
         observation = self.eng.get_lane_waiting_vehicle_count()
         info = self._get_info()
@@ -84,6 +92,11 @@ class CityFlowEnv(gym.Env):
         # Set each traffic light phase to specified action
         for i, phase in enumerate(action):
             self.eng.set_tl_phase(self._index_to_intersection_id[i], phase)
+            if self.last_action[i] == -1 or self.last_action[i] == phase:
+                self.steps_since_phase_change[i] += 1
+            else:
+                self.steps_since_phase_change[i] = 0
+
 
         # Step the CityFlow env
         self.eng.next_step()
