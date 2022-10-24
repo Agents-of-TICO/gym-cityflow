@@ -113,11 +113,16 @@ class CityFlowEnv(gym.Env):
         reward = self._get_reward()
         observation = self._get_obs()
         info = self._get_info()
+        truncated = False
 
         if self.render_mode == "human":
             self.render()
 
-        return observation, reward, terminated, False, info
+        return observation, reward, terminated, info
+        
+        # New return statement for updated gym, commented because stable baselines 3 hasn't updated
+        # to account for these changes
+        # return observation, reward, terminated, truncated, info
 
     def render(self):
         # Function called to render environment
