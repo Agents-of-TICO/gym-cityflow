@@ -14,6 +14,7 @@ class CityFlowEnv(gym.Env):
         self.current_step = 0
         self.total_wait_time = 0
         self.min_phase_time = 24
+        self.yellow_phase_time = 3
         self.phase_times = []
         # self.reward_range = (-float("inf"), float(1))
 
@@ -27,18 +28,18 @@ class CityFlowEnv(gym.Env):
         # Get list of non-virtual intersections
         intersections = list(filter(lambda val: not val['virtual'], self.roadnetDict['intersections']))
 
+        # Initialize
+        self.steps_in_current_phase = [0]*len(intersections)
+        self.last_action = [0]*len(intersections)
+
         # Get number of available phases available in each intersection and use it to create the action
         # space since each intersection has a number of actions equal to the number of states/phases the
         # intersection has. Here we also generate a dictionary to get the id of an intersection given an index
         intersection_phases = [None]*len(intersections)
-        self.steps_since_phase_change = [None]*len(intersections)
-        self.last_action = [None]*len(intersections)
         index_to_intersection_id = {}
         for i, intersection in enumerate(intersections):
             intersection_phases[i] = len(intersection['trafficLight']['lightphases'])
             index_to_intersection_id[i] = intersection['id']
-            self.steps_since_phase_change[i] = 0
-            self.last_action[i] = 0
         self.action_space = spaces.MultiDiscrete(intersection_phases)
         self._index_to_intersection_id = index_to_intersection_id
 
@@ -59,7 +60,7 @@ class CityFlowEnv(gym.Env):
         return self.eng.get_lane_waiting_vehicle_count()
 
     def _get_info(self):
-        return {"steps_since_phase_change": self.steps_since_phase_change,
+        return {"steps_in_current_phase": self.steps_in_current_phase,
                 "last_action": self.last_action
                 }
 
@@ -70,9 +71,9 @@ class CityFlowEnv(gym.Env):
         # reward picking the same phase multiple times and punish simulation for changing phases too quickly
         for i in range(len(action)):
             if self.last_action[i] == action[i]:
-                reward += self.min_phase_time / self.steps_since_phase_change[i]
-            elif self.steps_since_phase_change[i] < self.min_phase_time:
-                reward -= (self.min_phase_time + 1) / (self.steps_since_phase_change[i] + 1)
+                reward += self.min_phase_time / self.steps_in_current_phase[i]
+            elif self.steps_in_current_phase[i] < self.min_phase_time:
+                reward -= (self.min_phase_time + 1) / (self.steps_in_current_phase[i] + 1)
 
         return reward
 
@@ -90,8 +91,8 @@ class CityFlowEnv(gym.Env):
         self.current_step = 0
         self.total_wait_time = 0
         self.phase_times = []
-        for i in range(len(self.steps_since_phase_change)):
-            self.steps_since_phase_change[i] = 0
+        for i in range(len(self.steps_in_current_phase)):
+            self.steps_in_current_phase[i] = 0
             self.last_action[i] = 0
 
         observation = self.eng.get_lane_waiting_vehicle_count()
@@ -112,10 +113,10 @@ class CityFlowEnv(gym.Env):
         for i, phase in enumerate(action):
             self.eng.set_tl_phase(self._index_to_intersection_id[i], phase)
             if self.last_action[i] == phase:
-                self.steps_since_phase_change[i] += 1
+                self.steps_in_current_phase[i] += 1
             else:
-                self.phase_times.append(self.steps_since_phase_change[i])
-                self.steps_since_phase_change[i] = 0
+                self.phase_times.append(self.steps_in_current_phase[i])
+                self.steps_in_current_phase[i] = 0
 
         # Step the CityFlow env
         self.eng.next_step()
