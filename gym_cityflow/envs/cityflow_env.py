@@ -1,3 +1,5 @@
+from statistics import mean
+
 import gym
 from gym import spaces
 import cityflow
@@ -11,6 +13,9 @@ class CityFlowEnv(gym.Env):
         self.episode_steps = episode_steps  # The number of steps to simulate
         self.current_step = 0
         self.total_wait_time = 0
+        self.min_phase_time = 24
+        self.phase_times = []
+        # self.reward_range = (-float("inf"), float(1))
 
         # open cityflow config file into dict
         self.configDict = json.load(open(config_path))
@@ -26,10 +31,14 @@ class CityFlowEnv(gym.Env):
         # space since each intersection has a number of actions equal to the number of states/phases the
         # intersection has. Here we also generate a dictionary to get the id of an intersection given an index
         intersection_phases = [None]*len(intersections)
+        self.steps_since_phase_change = [None]*len(intersections)
+        self.last_action = [None]*len(intersections)
         index_to_intersection_id = {}
         for i, intersection in enumerate(intersections):
             intersection_phases[i] = len(intersection['trafficLight']['lightphases'])
             index_to_intersection_id[i] = intersection['id']
+            self.steps_since_phase_change[i] = 0
+            self.last_action[i] = 0
         self.action_space = spaces.MultiDiscrete(intersection_phases)
         self._index_to_intersection_id = index_to_intersection_id
 
@@ -50,23 +59,40 @@ class CityFlowEnv(gym.Env):
         return self.eng.get_lane_waiting_vehicle_count()
 
     def _get_info(self):
-        return {}
+        return {"steps_since_phase_change": self.steps_since_phase_change,
+                "last_action": self.last_action
+                }
 
-    def _get_reward(self):
+    def _get_reward(self, action):
         num_waiting = sum(self.eng.get_lane_waiting_vehicle_count().values())
-        return 1 / (num_waiting + 1)
+        reward = 1 / (num_waiting + 1)  # value between 0 and 1
+
+        # reward picking the same phase multiple times and punish simulation for changing phases too quickly
+        for i in range(len(action)):
+            if self.last_action[i] == action[i]:
+                reward += self.min_phase_time / self.steps_since_phase_change[i]
+            elif self.steps_since_phase_change[i] < self.min_phase_time:
+                reward -= (self.min_phase_time + 1) / (self.steps_since_phase_change[i] + 1)
+
+        return reward
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
-        # super().reset(seed=seed)
+        super().reset(seed=seed)
 
         print("Total wait time: " + str(self.total_wait_time))
+        if len(self.phase_times) > 0:
+            print(f"Average phase time: {mean(self.phase_times)} seconds")
 
         if seed is not None:
             self.eng.set_random_seed(seed)
         self.eng.reset(seed=False)
         self.current_step = 0
         self.total_wait_time = 0
+        self.phase_times = []
+        for i in range(len(self.steps_since_phase_change)):
+            self.steps_since_phase_change[i] = 0
+            self.last_action[i] = 0
 
         observation = self.eng.get_lane_waiting_vehicle_count()
         info = self._get_info()
@@ -74,7 +100,8 @@ class CityFlowEnv(gym.Env):
         if self.render_mode == "human":
             self.render()
 
-        return observation
+        # The Newest version of gym has info returned w/ reset but this causes issues with stable baselines 3
+        return observation # , info
 
     def step(self, action):
         # Check that input action size is equal to number of intersections
@@ -84,6 +111,11 @@ class CityFlowEnv(gym.Env):
         # Set each traffic light phase to specified action
         for i, phase in enumerate(action):
             self.eng.set_tl_phase(self._index_to_intersection_id[i], phase)
+            if self.last_action[i] == phase:
+                self.steps_since_phase_change[i] += 1
+            else:
+                self.phase_times.append(self.steps_since_phase_change[i])
+                self.steps_since_phase_change[i] = 0
 
         # Step the CityFlow env
         self.eng.next_step()
@@ -96,14 +128,22 @@ class CityFlowEnv(gym.Env):
 
         # An episode is done once we have simulated the number of steps defined in episode_steps
         terminated = self.episode_steps == self.current_step
-        reward = self._get_reward()
+        reward = self._get_reward(action)
         observation = self._get_obs()
         info = self._get_info()
+        truncated = False
 
         if self.render_mode == "human":
             self.render()
 
+        # Update last action taken
+        self.last_action = action
+
         return observation, reward, terminated, info
+
+        # New return statement for updated gym, commented because stable baselines 3 hasn't updated
+        # to account for these changes
+        # return observation, reward, terminated, truncated, info
 
     def render(self):
         # Function called to render environment
