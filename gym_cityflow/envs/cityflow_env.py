@@ -73,7 +73,7 @@ class CityFlowEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
-        super().reset(seed=seed)
+        super().reset()
 
         print("Total wait time: " + str(self.total_wait_time))
         if len(self.phase_times) > 0:
