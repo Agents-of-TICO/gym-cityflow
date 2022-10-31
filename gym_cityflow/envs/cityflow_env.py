@@ -27,7 +27,7 @@ class CityFlowEnv(gym.Env):
         self.flowDict = json.load(open(self.configDict['dir'] + self.configDict['flowFile']))
 
         # Get list of non-virtual intersections
-        intersection = list(filter(lambda val: not val['virtual'], self.roadnetDict['intersections']))
+        intersection = list(filter(lambda val: not val['virtual'], self.roadnetDict['intersections']))[0]
 
         # Initialize
         self.steps_in_current_phase = 0
