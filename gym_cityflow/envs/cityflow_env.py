@@ -26,23 +26,19 @@ class CityFlowEnv(gym.Env):
         self.flowDict = json.load(open(self.configDict['dir'] + self.configDict['flowFile']))
 
         # Get list of non-virtual intersections
-        intersections = list(filter(lambda val: not val['virtual'], self.roadnetDict['intersections']))
+        intersection = list(filter(lambda val: not val['virtual'], self.roadnetDict['intersections']))
 
         # Initialize
-        self.steps_in_current_phase = [0]*len(intersections)
-        self.last_action = [0]*len(intersections)
+        self.steps_in_current_phase = 0
+        self.last_action = 0
 
         # Get number of available phases available in each intersection and use it to create the action
         # space since each intersection has a number of actions equal to the number of states/phases the
         # intersection has. Here we also generate a dictionary to get the id of an intersection given an index
-        intersection_phases = [None]*len(intersections)
-        index_to_intersection_id = {}
-        for i, intersection in enumerate(intersections):
-            # Subtract one to remove yellow phase from action space
-            intersection_phases[i] = len(intersection['trafficLight']['lightphases']) - 1
-            index_to_intersection_id[i] = intersection['id']
-        self.action_space = spaces.MultiDiscrete(intersection_phases)
-        self._index_to_intersection_id = index_to_intersection_id
+        # Subtract one to remove yellow phase from action space
+        self.intersection_phases = len(intersection['trafficLight']['lightphases']) - 1
+        self.action_space = spaces.Discrete(self.intersection_phases)
+        self._intersection_id = intersection['id']
 
         # create cityflow engine
         self.eng = cityflow.Engine(config_path, thread_num=num_threads)
@@ -85,9 +81,8 @@ class CityFlowEnv(gym.Env):
         self.current_step = 0
         self.total_wait_time = 0
         self.phase_times = []
-        for i in range(len(self.steps_in_current_phase)):
-            self.steps_in_current_phase[i] = 0
-            self.last_action[i] = 0
+        self.steps_in_current_phase = 0
+        self.last_action = 0
 
         observation = self.eng.get_lane_waiting_vehicle_count()
         info = self._get_info()
@@ -99,32 +94,24 @@ class CityFlowEnv(gym.Env):
         return observation # , info
 
     def step(self, action):
-        # Check that input action size is equal to number of intersections
-        if len(action) != len(self._index_to_intersection_id):
-            raise Warning('Action length not equal to number of intersections')
-
         # Set each traffic light phase to specified action. If a change in phase is requested, go to 'yellow' phase
         # (phase: 0) for self.transition_phase_time before changing to new phase
-        for i, phase in enumerate(action):
-            phase += 1  # increment selected phase by one since 0 is yellow phase
+        action += 1  # increment selected phase by one since 0 is yellow phase
 
-            # If we are in the same phase as last time increment the relevant value in steps_in_current_phase
-            if self.last_action[i] == 0 and self.steps_in_current_phase[i] < self.transition_phase_time:
-                phase = 0    # Once we go to the 'all-red' state stay there for transition_phase_time steps
-                self.steps_in_current_phase[i] += 1
-            elif self.last_action[i] == 0:
-                self.eng.set_tl_phase(self._index_to_intersection_id[i], phase)
-                self.steps_in_current_phase[i] = 1
-            elif self.last_action[i] == phase:
-                self.steps_in_current_phase[i] += 1
-            else:
-                phase = 0
-                self.eng.set_tl_phase(self._index_to_intersection_id[i], phase)
-                self.phase_times.append(self.steps_in_current_phase[i])
-                self.steps_in_current_phase[i] = 1
-
-            # Write any changes we made to selected phase to the 'action' array
-            action[i] = phase
+        # If we are in the same phase as last time increment the relevant value in steps_in_current_phase
+        if self.last_action == 0 and self.steps_in_current_phase < self.transition_phase_time:
+            action = 0    # Once we go to the 'all-red' state stay there for transition_phase_time steps
+            self.steps_in_current_phase += 1
+        elif self.last_action == 0:
+            self.eng.set_tl_phase(self._intersection_id, action)
+            self.steps_in_current_phase = 1
+        elif self.last_action == action:
+            self.steps_in_current_phase += 1
+        else:
+            action = 0
+            self.eng.set_tl_phase(self._intersection_id, action)
+            self.phase_times.append(self.steps_in_current_phase)
+            self.steps_in_current_phase = 1
 
         # Step the CityFlow env
         self.eng.next_step()
