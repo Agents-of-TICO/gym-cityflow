@@ -65,16 +65,9 @@ class CityFlowEnv(gym.Env):
                 "last_action": self.last_action
                 }
 
-    def _get_reward(self, action):
+    def _get_reward(self):
         num_waiting = sum(self.eng.get_lane_waiting_vehicle_count().values())
         reward = -num_waiting  # Negate the value since we want higher values to represent better performance
-
-        # reward picking the same phase multiple times and punish simulation for changing phases too quickly
-        for i in range(len(self.steps_in_current_phase)):
-            if self.steps_in_current_phase[i] == action[i]:
-                reward += self.min_phase_time / self.steps_in_current_phase[i]
-            elif self.steps_in_current_phase[i] < self.min_phase_time:
-                reward -= (self.min_phase_time + 1) / (self.steps_in_current_phase[i] + 1)
 
         return reward
 
@@ -144,7 +137,7 @@ class CityFlowEnv(gym.Env):
 
         # An episode is done once we have simulated the number of steps defined in episode_steps
         terminated = self.episode_steps == self.current_step
-        reward = self._get_reward(action)
+        reward = self._get_reward()
         observation = self._get_obs()
         info = self._get_info()
         truncated = False
