@@ -9,7 +9,7 @@ import json
 class CityFlowEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "max_waiting": 128}
 
-    def __init__(self, config_path, episode_steps=10000, num_threads=1, reward_fun=1 render_mode=None):
+    def __init__(self, config_path, episode_steps=10000, num_threads=1, reward_fun=1, render_mode=None):
         self.episode_steps = episode_steps  # The number of steps to simulate
         self.current_step = 0
         self.total_wait_time = 0
