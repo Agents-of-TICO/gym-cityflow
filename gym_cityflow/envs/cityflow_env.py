@@ -83,8 +83,7 @@ class CityFlowEnv(gym.Env):
 
     # Average Speed reward function
     def _get_reward_avg_speed(self):
-        return sum(self.eng.get_vehicle_speed().values()/ 16.67) / sum(self.eng.get_vehicle_count())
-
+        return (sum(self.eng.get_vehicle_speed().values()) / 16.67) / self.eng.get_vehicle_count()
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
