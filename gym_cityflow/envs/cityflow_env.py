@@ -7,7 +7,7 @@ import json
 
 
 class CityFlowEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "max_waiting": 64}
+    metadata = {"render_modes": ["human", "rgb_array"], "max_waiting": 128}
 
     def __init__(self, config_path, episode_steps=10000, num_threads=1, render_mode=None):
         self.episode_steps = episode_steps  # The number of steps to simulate
@@ -39,7 +39,7 @@ class CityFlowEnv(gym.Env):
         index_to_intersection_id = {}
         for i, intersection in enumerate(intersections):
             # Subtract one to remove yellow phase from action space
-            intersection_phases[i] = len(intersection['trafficLight']['lightphases'])
+            intersection_phases[i] = len(intersection['trafficLight']['lightphases']) - 1
             index_to_intersection_id[i] = intersection['id']
         self.action_space = spaces.MultiDiscrete(intersection_phases)
         self._index_to_intersection_id = index_to_intersection_id
