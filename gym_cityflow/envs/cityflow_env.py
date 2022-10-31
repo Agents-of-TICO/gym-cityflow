@@ -69,7 +69,7 @@ class CityFlowEnv(gym.Env):
 
         # Queue squared reward
         elif self.reward_fun == 2:
-            reward = (-1 * sum(self.eng.get_lane_waiting_vehicle_count().values()))^2
+            reward = -1 * (sum(self.eng.get_lane_waiting_vehicle_count().values()))^2
 
         # Average Speed reward function
         elif self.reward_fun == 3:
