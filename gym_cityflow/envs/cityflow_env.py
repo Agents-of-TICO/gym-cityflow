@@ -73,7 +73,7 @@ class CityFlowEnv(gym.Env):
 
         # Average Speed reward function
         elif self.reward_fun == 3:
-            reward = (sum(self.eng.get_vehicle_speed().values()) / 16.67) / sum(self.eng.get_vehicle_count())
+            reward = (sum(self.eng.get_vehicle_speed().values()) / 16.67) / self.eng.get_vehicle_count()
 
         return reward
 
