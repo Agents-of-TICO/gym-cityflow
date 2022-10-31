@@ -9,13 +9,14 @@ import json
 class CityFlowEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "max_waiting": 128}
 
-    def __init__(self, config_path, episode_steps=10000, num_threads=1, render_mode=None):
+    def __init__(self, config_path, episode_steps=10000, num_threads=1, reward_fun=1 render_mode=None):
         self.episode_steps = episode_steps  # The number of steps to simulate
         self.current_step = 0
         self.total_wait_time = 0
         self.min_phase_time = 24
         self.transition_phase_time = 3
         self.phase_times = []
+        self.reward_fun = reward_fun
         # self.reward_range = (-float("inf"), float(1))
 
         # open cityflow config file into dict
@@ -62,8 +63,17 @@ class CityFlowEnv(gym.Env):
                 }
 
     def _get_reward(self):
-        num_waiting = sum(self.eng.get_lane_waiting_vehicle_count().values())
-        reward = -num_waiting  # Negate the value since we want higher values to represent better performance
+        if self.reward_fun == 1:
+            num_waiting = sum(self.eng.get_lane_waiting_vehicle_count().values())
+            reward = -num_waiting  # Negate the value since we want higher values to represent better performance
+
+        # Queue squared reward
+        elif self.reward_fun == 2:
+            reward = (-1 * sum(self.eng.get_lane_waiting_vehicle_count().values()))^2
+
+        # Average Speed reward function
+        elif self.reward_fun == 3:
+            reward = sum(self.eng.get_vehicle_speed().values()/ 16.67) / sum(self.eng.get_vehicle_count())
 
         return reward
 
