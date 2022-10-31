@@ -39,7 +39,7 @@ class CityFlowEnv(gym.Env):
         index_to_intersection_id = {}
         for i, intersection in enumerate(intersections):
             # Subtract one to remove yellow phase from action space
-            intersection_phases[i] = len(intersection['trafficLight']['lightphases']) - 1
+            intersection_phases[i] = len(intersection['trafficLight']['lightphases'])
             index_to_intersection_id[i] = intersection['id']
         self.action_space = spaces.MultiDiscrete(intersection_phases)
         self._index_to_intersection_id = index_to_intersection_id
