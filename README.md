@@ -7,20 +7,36 @@ and has been updated to work with current versions of OpenAI Gym (v0.21.0).
 ## Prerequisites
 
 As an OpenAI Gym environment that implements the CityFlow simulation engine the following 
-prerequisites are required to use this environment.
+prerequisites are required to use this environment:
 
 - [OpenAI Gym](https://www.gymlibrary.dev/)
 - [CityFlow](https://cityflow.readthedocs.io/en/latest/install.html)
 
-Unfortunately, as CityFlow is not registered with a python package index you need to clone the repository
-and install the package using the 'pip install -e .' command from the root directory of the repository.
+OpenAI Gym can be installed via pip with the following command:
+
+'pip install gym'
+
+On the other hand, as CityFlow is not registered with a python package index you need to build the package
+from the source code:
+
+Install Dependencies:
+`sudo apt update && sudo apt install -y build-essential cmake`
+
+Clone CityFlow project from github:
+`git clone https://github.com/cityflow-project/CityFlow.git`
+
+Then go to CityFlow project’s root directory and run:
+`pip install .`
 
 ## Installation
 
-`gym_cityflow` is currently not a part of any package must be manually installed by running the following 
-commands in the root directory of the repository after downloading/cloning the repository:
+`gym_cityflow` is currently not a part of any package must be manually installed from the source:
 
-`pip install -e .`
+Clone the gym-cityflow project from github:
+`git clone https://github.com/Agents-of-TICO/gym-cityflow.git`
+
+Then go to  the gym-cityflow project’s root directory and run:
+`pip install .`
 
 `gym_cityflow` can then be used as a python library as follows:
 
@@ -51,7 +67,9 @@ the [OpenAI Documentation](https://gym.openai.com/docs/)
 
 `env.reset(seed=42)` can also be called with a new seed to restart the environment with a new seed
 
-Here is an example of how to train and run PPO on a CityFlow environment:
+Here is an example of how to train and run PPO on a CityFlow environment (NOTE: this example uses the PPO model provided
+by stable-baselines3 to facilitate training, if you want to run this example you should install stable-baselines3 with the
+command `pip install stable-baselines3`)
 
 ```python
 import gym
