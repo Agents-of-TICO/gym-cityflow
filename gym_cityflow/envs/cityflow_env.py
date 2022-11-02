@@ -8,7 +8,7 @@ import json
 
 class CityFlowEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "max_waiting": 128,
-                "reward_funcs": ["queueSum", "queueSquared", "queue&time", "avgSpeed"]
+                "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "avgSpeed", "phaseTime"]
                 }
 
     def __init__(self, config_path, episode_steps=10000, num_threads=1, reward_func="queueSum", render_mode=None):
@@ -26,7 +26,8 @@ class CityFlowEnv(gym.Env):
         self.reward_func_dict = {"queueSum": self._get_reward_queue_sum,
                                  "queueSquared": self._get_reward_queue_squared,
                                  "avgSpeed": self._get_reward_avg_speed,
-                                 "queue&time": self._get_reward_sum_and_phase_time
+                                 "queue&Time": self._get_reward_sum_and_phase_time,
+                                 "phaseTime": self._get_reward_phase_time
                                  }
 
         # open cityflow config file into dict
@@ -83,11 +84,18 @@ class CityFlowEnv(gym.Env):
     def _get_reward_queue_squared(self):
         return -1 * (sum(self.eng.get_lane_waiting_vehicle_count().values()))^2
 
-    # Sum of waiting vehicles
+    # Time in current phase relative to min_phase_time
+    def _get_reward_phase_time(self):
+        reward = 0
+        if 2 <= self.steps_in_current_phase <= self.min_phase_time:
+            reward += self.steps_in_current_phase / self.min_phase_time
+        return reward
+
+    # One over Sum of waiting vehicles plus wait time
     def _get_reward_sum_and_phase_time(self):
         reward = 1 / (1 + sum(self.eng.get_lane_waiting_vehicle_count().values()))
-        if self.steps_in_current_phase >= 2:
-            reward += self.min_phase_time / self.steps_in_current_phase
+        if 2 <= self.steps_in_current_phase <= self.min_phase_time:
+            reward += self.steps_in_current_phase / self.min_phase_time
         return reward
 
     # Average Speed reward function
