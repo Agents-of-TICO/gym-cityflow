@@ -89,7 +89,7 @@ class CityFlowEnv(gym.Env):
     def _get_reward_phase_time(self):
         reward = 0
         if 2 <= self.steps_in_current_phase <= self.min_phase_time:
-            reward += 5
+            reward += 9999
         elif 2 > self.steps_in_current_phase:
             reward -= 2
         return reward
