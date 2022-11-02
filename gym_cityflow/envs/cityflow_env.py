@@ -7,8 +7,9 @@ import json
 
 
 class CityFlowEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "reward_funcs": ["queueSum", "queueSquared", "avgSpeed"],
-                "max_waiting": 128}
+    metadata = {"render_modes": ["human", "rgb_array"], "max_waiting": 128,
+                "reward_funcs": ["queueSum", "queueSquared", "queue&time", "avgSpeed"]
+                }
 
     def __init__(self, config_path, episode_steps=10000, num_threads=1, reward_func="queueSum", render_mode=None):
         self.episode_steps = episode_steps  # The number of steps to simulate
