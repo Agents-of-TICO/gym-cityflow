@@ -12,6 +12,8 @@ prerequisites are required to use this environment:
 - [OpenAI Gym](https://www.gymlibrary.dev/)
 - [CityFlow](https://cityflow.readthedocs.io/en/latest/install.html)
 
+### Installing Prerequisites
+
 OpenAI Gym can be installed via pip with the following command:
 
 `pip install gym`
