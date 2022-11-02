@@ -33,7 +33,7 @@ Then go to CityFlow project’s root directory and run:
 
 `pip install .`
 
-## Installation
+## Gym-cityflow Installation
 
 `gym_cityflow` is currently not a part of any package must be manually installed from the source:
 
