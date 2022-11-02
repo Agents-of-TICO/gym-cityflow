@@ -25,6 +25,7 @@ class CityFlowEnv(gym.Env):
         self.reward_func_dict = {"queueSum": self._get_reward_queue_sum,
                                  "queueSquared": self._get_reward_queue_squared,
                                  "avgSpeed": self._get_reward_avg_speed,
+                                 "queue&time": self._get_reward_sum_and_phase_time
                                  }
 
         # open cityflow config file into dict
@@ -77,9 +78,16 @@ class CityFlowEnv(gym.Env):
     def _get_reward_queue_sum(self):
         return -sum(self.eng.get_lane_waiting_vehicle_count().values())
 
-        # Queue squared reward
+    # Queue squared reward
     def _get_reward_queue_squared(self):
         return -1 * (sum(self.eng.get_lane_waiting_vehicle_count().values()))^2
+
+    # Sum of waiting vehicles
+    def _get_reward_sum_and_phase_time(self):
+        reward = 1 / (1 + sum(self.eng.get_lane_waiting_vehicle_count().values()))
+        if self.steps_in_current_phase >= 2:
+            reward += self.min_phase_time / self.steps_in_current_phase
+        return reward
 
     # Average Speed reward function
     def _get_reward_avg_speed(self):
