@@ -146,18 +146,14 @@ class CityFlowEnv(gym.Env):
         action += 1  # increment selected phase by one since 0 is yellow phase
 
         # If we are in the same phase as last time increment the relevant value in steps_in_current_phase
-        if self.last_action == 0 and self.steps_in_current_phase < self.transition_phase_time:
-            action = 0    # Once we go to the 'all-red' state stay there for transition_phase_time steps
-            self.steps_in_current_phase += 1
-        elif self.last_action == 0:
-            self.eng.set_tl_phase(self._intersection_id, action)
-            self.steps_in_current_phase = 1
-        elif self.last_action == action:
+        if self.last_action == action:
             self.steps_in_current_phase += 1
         else:
-            action = 0
-            self.eng.set_tl_phase(self._intersection_id, action)
+            self.eng.set_tl_phase(self._intersection_id, 0)
             self.phase_times.append(self.steps_in_current_phase)
+            for i in range(self.transition_phase_time):
+                self.eng.next_step()
+            self.eng.set_tl_phase(self._intersection_id, action)
             self.steps_in_current_phase = 1
 
         # Step the CityFlow env
@@ -195,5 +191,8 @@ class CityFlowEnv(gym.Env):
 
     def close(self):
         # if we need to do anything on env exit this is where we do it
+        print("Total wait time: " + str(self.total_wait_time))
+        if len(self.phase_times) > 0:
+            print(f"Average phase time: {mean(self.phase_times)} seconds")
         print("Exiting...")
         print("Total wait time: " + str(self.total_wait_time))
