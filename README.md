@@ -14,18 +14,21 @@ prerequisites are required to use this environment:
 
 OpenAI Gym can be installed via pip with the following command:
 
-'pip install gym'
+`pip install gym`
 
 On the other hand, as CityFlow is not registered with a python package index you need to build the package
 from the source code:
 
 Install Dependencies:
+
 `sudo apt update && sudo apt install -y build-essential cmake`
 
 Clone CityFlow project from github:
+
 `git clone https://github.com/cityflow-project/CityFlow.git`
 
 Then go to CityFlow project’s root directory and run:
+
 `pip install .`
 
 ## Installation
@@ -33,9 +36,11 @@ Then go to CityFlow project’s root directory and run:
 `gym_cityflow` is currently not a part of any package must be manually installed from the source:
 
 Clone the gym-cityflow project from github:
+
 `git clone https://github.com/Agents-of-TICO/gym-cityflow.git`
 
 Then go to  the gym-cityflow project’s root directory and run:
+
 `pip install .`
 
 `gym_cityflow` can then be used as a python library as follows:
