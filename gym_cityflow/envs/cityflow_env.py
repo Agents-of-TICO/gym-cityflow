@@ -31,7 +31,7 @@ class CityFlowEnv(gym.Env):
                                  "phaseTime": self._get_reward_phase_time
                                  }
 
-        print(f"Using reward function: #{self.reward_func_dict[reward_func].func_name}")
+        print(f"Using reward function: #{self.reward_func_dict[reward_func].__name__}")
         # open cityflow config file into dict
         self.configDict = json.load(open(config_path))
         self.interval = self.configDict['interval']
