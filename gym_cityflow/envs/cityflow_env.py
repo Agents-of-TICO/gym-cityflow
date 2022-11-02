@@ -103,7 +103,9 @@ class CityFlowEnv(gym.Env):
     def _get_reward_sum_and_phase_time_flat(self):
         reward = 1 / (1 + sum(self.eng.get_lane_waiting_vehicle_count().values()))
         if 2 <= self.steps_in_current_phase <= self.min_phase_time:
-            reward += 2
+            reward += 5
+        elif 2 > self.steps_in_current_phase:
+            reward -= 2
         return reward
 
     # Average Speed reward function
