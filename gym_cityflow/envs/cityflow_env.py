@@ -8,7 +8,7 @@ import json
 
 class CityFlowEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "max_waiting": 128,
-                "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "avgSpeed", "phaseTime"]
+                "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "queue&TimeF", "avgSpeed", "phaseTime"]
                 }
 
     def __init__(self, config_path, episode_steps=10000, num_threads=1, reward_func="queueSum", render_mode=None):
@@ -27,6 +27,7 @@ class CityFlowEnv(gym.Env):
                                  "queueSquared": self._get_reward_queue_squared,
                                  "avgSpeed": self._get_reward_avg_speed,
                                  "queue&Time": self._get_reward_sum_and_phase_time,
+                                 "queue&TimeF": self._get_reward_sum_and_phase_time_flat,
                                  "phaseTime": self._get_reward_phase_time
                                  }
 
@@ -96,6 +97,13 @@ class CityFlowEnv(gym.Env):
         reward = 1 / (1 + sum(self.eng.get_lane_waiting_vehicle_count().values()))
         if 2 <= self.steps_in_current_phase <= self.min_phase_time:
             reward += self.steps_in_current_phase / self.min_phase_time
+        return reward
+
+    # One over Sum of waiting vehicles plus flat wait time reward
+    def _get_reward_sum_and_phase_time_flat(self):
+        reward = 1 / (1 + sum(self.eng.get_lane_waiting_vehicle_count().values()))
+        if 2 <= self.steps_in_current_phase <= self.min_phase_time:
+            reward += 2
         return reward
 
     # Average Speed reward function
