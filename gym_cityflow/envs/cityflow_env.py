@@ -31,7 +31,7 @@ class CityFlowEnv(gym.Env):
                                  "phaseTime": self._get_reward_phase_time
                                  }
 
-        print(f"Using reward function: #{self.reward_func_dict[reward_func].__name__}")
+        print(f"Using reward function: {self.reward_func_dict[reward_func].__name__}")
         # open cityflow config file into dict
         self.configDict = json.load(open(config_path))
         self.interval = self.configDict['interval']
@@ -90,9 +90,9 @@ class CityFlowEnv(gym.Env):
     def _get_reward_phase_time(self):
         reward = None
         if 2 <= self.steps_in_current_phase <= self.min_phase_time:
-            reward = float("inf")
+            reward = 128
         elif 2 > self.steps_in_current_phase:
-            reward = -float("inf")
+            reward = -1024
         return reward
 
     # One over Sum of waiting vehicles plus wait time
