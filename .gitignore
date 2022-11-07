@@ -4,6 +4,8 @@ gym_cityflow.egg-info/requires.txt
 gym_cityflow.egg-info/SOURCES.txt
 gym_cityflow.egg-info/top_level.txt
 gym_cityflow/envs/__pycache__/cityflow_env.cpython-38.pyc
+gym_cityflow/envs/__pycache__/__init__.cpython-38.
+gym_cityflow/__pycache__/__init__.cpython-38.pyc
 tests/sample_data/sample_replayLog.txt
 tests/sample_data/sample_roadnetLog.json
 # IDE Files
