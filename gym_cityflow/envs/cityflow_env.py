@@ -15,7 +15,7 @@ class CityFlowEnv(gym.Env):
         self.episode_steps = episode_steps  # The number of steps to simulate
         self.current_step = 0
         self.total_wait_time = 0
-        self.min_phase_time = 24
+        self.phase_step_goal = 24
         self.transition_phase_time = 3
         self.config_path = config_path
         self.num_threads = num_threads
@@ -88,26 +88,40 @@ class CityFlowEnv(gym.Env):
     def _get_reward_queue_squared(self):
         return -1 * (sum(self.eng.get_lane_waiting_vehicle_count().values()))^2
 
-    # Time in current phase relative to min_phase_time
+    # Time in current phase relative to phase_step_goal
     def _get_reward_phase_time(self):
         reward = None
-        if 2 <= self.steps_in_current_phase <= self.min_phase_time:
+        if 2 <= self.steps_in_current_phase <= self.phase_step_goal:
+            # If the same phase as last time is selected, give reward proportional to the number of steps we have been
+            # in the current stage.
             reward = 128 * self.steps_in_current_phase
         elif 2 > self.steps_in_current_phase:
-            reward = -1024
+            # If the phase was just changed, give a positive reward if the env spent more steps in the phase than
+            # defined in self.phase_step_goal, decreasing the reward if the env exceeds the value in
+            # self.phase_step_goal. If the env spends less time in a phase that the time given in self.phase_step_goal,
+            # provide a negative reward proportional to difference.
+            if self.phase_times[-1] >= self.phase_step_goal:
+                reward = 128 * self.phase_step_goal - 128 * (self.phase_times[-1] - self.phase_step_goal)
+            else:
+                reward = -128 * (self.phase_step_goal - self.phase_times[-1])
+        else:
+            # If the reward function gets here we have picked the same phase for more steps than is defined by
+            # self.phase_step_goal, so we provide a negative reward proportional to the number of steps we exceed
+            # self.phase_step_goal by
+            reward = -128 * (self.steps_in_current_phase - self.phase_step_goal)
         return reward
 
     # One over Sum of waiting vehicles plus wait time
     def _get_reward_sum_and_phase_time(self):
         reward = 1 / (1 + sum(self.eng.get_lane_waiting_vehicle_count().values()))
-        if 2 <= self.steps_in_current_phase <= self.min_phase_time:
-            reward += self.steps_in_current_phase / self.min_phase_time
+        if 2 <= self.steps_in_current_phase <= self.phase_step_goal:
+            reward += self.steps_in_current_phase / self.phase_step_goal
         return reward
 
     # One over Sum of waiting vehicles plus flat wait time reward
     def _get_reward_sum_and_phase_time_flat(self):
         reward = 1 / (1 + sum(self.eng.get_lane_waiting_vehicle_count().values()))
-        if 2 <= self.steps_in_current_phase <= self.min_phase_time:
+        if 2 <= self.steps_in_current_phase <= self.phase_step_goal:
             reward += 5
         elif 2 > self.steps_in_current_phase:
             reward -= 2
@@ -190,6 +204,9 @@ class CityFlowEnv(gym.Env):
     def load_fresh_engine(self):
         # Recreate the engine with the same params to generate fresh replay file
         self.eng = cityflow.Engine(self.config_path, thread_num=self.num_threads)
+
+    def get_phase_times(self):
+        return self.phase_times
 
     def render(self):
         # Function called to render environment
