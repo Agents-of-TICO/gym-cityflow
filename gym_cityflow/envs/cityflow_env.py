@@ -17,6 +17,8 @@ class CityFlowEnv(gym.Env):
         self.total_wait_time = 0
         self.min_phase_time = 24
         self.transition_phase_time = 3
+        self.config_path = config_path
+        self.num_threads = num_threads
         self.phase_times = []
         # self.reward_range = (-float("inf"), float(1))
 
@@ -184,6 +186,10 @@ class CityFlowEnv(gym.Env):
         # New return statement for updated gym, commented because stable baselines 3 hasn't updated
         # to account for these changes
         # return observation, reward, terminated, truncated, info
+
+    def load_fresh_engine(self):
+        # Recreate the engine with the same params to generate fresh replay file
+        self.eng = cityflow.Engine(self.config_path, thread_num=self.num_threads)
 
     def render(self):
         # Function called to render environment
