@@ -64,7 +64,7 @@ class CityFlowEnv(gym.Env):
         observation_space_dict = self.eng.get_lane_waiting_vehicle_count()
         for key in observation_space_dict:
             observation_space_dict[key] = spaces.Discrete(self.metadata["max_waiting"])
-        observation_space_dict["steps_in_phase"] = float("inf")
+        observation_space_dict["steps_in_phase"] = spaces.Discrete(float("inf"))
         self.observation_space = spaces.Dict(observation_space_dict)
 
         # Verify and set render mode
