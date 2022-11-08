@@ -13,7 +13,8 @@ class CityFlowEnv(gym.Env):
                 "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "queue&TimeF", "avgSpeed", "phaseTime"]
                 }
 
-    def __init__(self, config_path, episode_steps=10000, num_threads=1, reward_func="queueSum", render_mode=None):
+    def __init__(self, config_path, episode_steps=10000, num_threads=1, reward_func="queueSum", seed=None,
+                 render_mode=None):
         self.episode_steps = episode_steps  # The number of steps to simulate
         self.current_step = 0
         self.total_wait_time = 0
@@ -37,6 +38,7 @@ class CityFlowEnv(gym.Env):
                                  }
 
         print(f"Using reward function: {self.reward_func_dict[reward_func].__name__}")
+
         # open cityflow config file into dict
         self.configDict = json.load(open(config_path))
         self.interval = self.configDict['interval']
@@ -61,6 +63,10 @@ class CityFlowEnv(gym.Env):
 
         # create cityflow engine
         self.eng = cityflow.Engine(config_path, thread_num=num_threads)
+
+        # set seed if given
+        if seed is not None:
+            self.eng.set_random_seed(seed)
 
         # Observations are dictionaries containing the number of waiting vehicles in each lane in the simulation.
         # Maximum number of waiting vehicles in each lane is defined by the "max_waiting" metadata parameter
