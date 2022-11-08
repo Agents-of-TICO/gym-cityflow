@@ -1,4 +1,5 @@
 import sys
+from random import random
 from statistics import mean
 
 import gym
@@ -18,6 +19,7 @@ class CityFlowEnv(gym.Env):
         self.total_wait_time = 0
         self.phase_step_goal = 24
         self.transition_phase_time = 3
+        self.max_phase_time = 64
         self.config_path = config_path
         self.num_threads = num_threads
         self.phase_times = []
@@ -53,8 +55,8 @@ class CityFlowEnv(gym.Env):
         # space since each intersection has a number of actions equal to the number of states/phases the
         # intersection has. Here we also generate a dictionary to get the id of an intersection given an index
         # Subtract one to remove yellow phase from action space
-        self.intersection_phases = len(intersection['trafficLight']['lightphases']) - 1
-        self.action_space = spaces.Discrete(self.intersection_phases)
+        self.num_phases = len(intersection['trafficLight']['lightphases']) - 1
+        self.action_space = spaces.Discrete(self.num_phases)
         self._intersection_id = intersection['id']
 
         # create cityflow engine
@@ -65,7 +67,7 @@ class CityFlowEnv(gym.Env):
         observation_space_dict = self.eng.get_lane_waiting_vehicle_count()
         for key in observation_space_dict:
             observation_space_dict[key] = spaces.Discrete(self.metadata["max_waiting"])
-        observation_space_dict["steps_in_phase"] = spaces.Discrete(999999999)
+        observation_space_dict["steps_in_phase"] = spaces.Discrete(self.max_phase_time)
         self.observation_space = spaces.Dict(observation_space_dict)
 
         # Verify and set render mode
@@ -169,16 +171,15 @@ class CityFlowEnv(gym.Env):
         # (phase: 0) for self.transition_phase_time before changing to new phase
         action += 1  # increment selected phase by one since 0 is yellow phase
 
+        # If we reach or exceed the maximum phase time allowed switch to a random phase
+        if self.steps_in_current_phase >= self.max_phase_time and self.last_action == action:
+            action = random.choice([range(self.num_phases)].remove(self.last_action))
+
         # If we are in the same phase as last time increment the relevant value in steps_in_current_phase
         if self.last_action == action:
             self.steps_in_current_phase += 1
         else:
-            self.eng.set_tl_phase(self._intersection_id, 0)
-            self.phase_times.append(self.steps_in_current_phase)
-            for i in range(self.transition_phase_time):
-                self.eng.next_step()
-            self.eng.set_tl_phase(self._intersection_id, action)
-            self.steps_in_current_phase = 1
+            self._transition_phase(action)
 
         # Step the CityFlow env
         self.eng.next_step()
@@ -207,6 +208,20 @@ class CityFlowEnv(gym.Env):
         # New return statement for updated gym, commented because stable baselines 3 hasn't updated
         # to account for these changes
         # return observation, reward, terminated, truncated, info
+
+    def _transition_phase(self, next_phase):
+        # Switch to the given phase after taking a predefined number of steps in a 'red'/transition phase
+
+        # Set intersection to intermediate phase and take self.steps_in_current_phase steps
+        self.eng.set_tl_phase(self._intersection_id, 0)
+        for i in range(self.transition_phase_time):
+            self.eng.next_step()
+        # Switch to given phase
+        self.eng.set_tl_phase(self._intersection_id, next_phase)
+
+        # Record and reset self.steps_in_current_phase
+        self.phase_times.append(self.steps_in_current_phase)
+        self.steps_in_current_phase = 1
 
     def load_fresh_engine(self):
         # Recreate the engine with the same params to generate fresh replay file
