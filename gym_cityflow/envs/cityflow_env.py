@@ -247,4 +247,3 @@ class CityFlowEnv(gym.Env):
         if len(self.phase_times) > 0:
             print(f"Average phase time: {mean(self.phase_times)} seconds")
         print("Exiting...")
-        print("Total wait time: " + str(self.total_wait_time))
