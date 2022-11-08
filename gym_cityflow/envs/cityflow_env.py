@@ -70,7 +70,11 @@ class CityFlowEnv(gym.Env):
         self.render_mode = render_mode
 
     def _get_obs(self):
-        return self.eng.get_lane_waiting_vehicle_count()
+        # Get Dictionary where keys are lane id's and values are the # of waiting vehicles in the lane
+        obs = self.eng.get_lane_waiting_vehicle_count()
+        # Add steps in current phase to dictionary
+        obs["steps_in_phase"] = self.steps_in_current_phase
+        return obs
 
     def _get_info(self):
         return {"steps_in_current_phase": self.steps_in_current_phase,
