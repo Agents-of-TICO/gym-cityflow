@@ -157,7 +157,7 @@ class CityFlowEnv(gym.Env):
         self.steps_in_current_phase = 0
         self.last_action = 0
 
-        observation = self.eng.get_lane_waiting_vehicle_count()
+        observation = self._get_obs()
         info = self._get_info()
 
         if self.render_mode == "human":
