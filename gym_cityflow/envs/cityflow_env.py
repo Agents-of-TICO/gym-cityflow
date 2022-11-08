@@ -7,7 +7,7 @@ import json
 
 
 class CityFlowEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "max_waiting": 128,
+    metadata = {"render_modes": ["human"], "max_waiting": 128,
                 "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "queue&TimeF", "avgSpeed", "phaseTime"]
                 }
 
@@ -64,8 +64,10 @@ class CityFlowEnv(gym.Env):
         observation_space_dict = self.eng.get_lane_waiting_vehicle_count()
         for key in observation_space_dict:
             observation_space_dict[key] = spaces.Discrete(self.metadata["max_waiting"])
+        observation_space_dict["steps_in_phase"] = float("inf")
         self.observation_space = spaces.Dict(observation_space_dict)
 
+        # Verify and set render mode
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
 
