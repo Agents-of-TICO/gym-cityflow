@@ -179,7 +179,9 @@ class CityFlowEnv(gym.Env):
 
         # If we reach or exceed the maximum phase time allowed switch to a random phase
         if self.steps_in_current_phase >= self.max_phase_time and self.last_action == action:
-            action = random.choice([range(1, self.num_phases + 1)].remove(self.last_action))
+            actions = [*range(1, self.num_phases + 1)]
+            actions.remove(self.last_action)
+            action = random.choice(actions)
 
         # If we are in the same phase as last time increment the relevant value in steps_in_current_phase
         if self.last_action == action:
