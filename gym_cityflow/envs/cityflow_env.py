@@ -1,5 +1,5 @@
 import sys
-from random import random
+import random
 from statistics import mean
 
 import gym
@@ -19,7 +19,7 @@ class CityFlowEnv(gym.Env):
         self.current_step = 0
         self.total_wait_time = 0
         self.phase_step_goal = 24
-        self.transition_phase_time = 3
+        self.transition_phase_time = 5
         self.max_phase_time = 64
         self.config_path = config_path
         self.num_threads = num_threads
