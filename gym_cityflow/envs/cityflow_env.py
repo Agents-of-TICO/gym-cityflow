@@ -233,6 +233,12 @@ class CityFlowEnv(gym.Env):
         # Recreate the engine with the same params to generate fresh replay file
         self.eng = cityflow.Engine(self.config_path, thread_num=self.num_threads)
 
+    def start_replay(self):
+        self.eng.set_save_replay(True)
+
+    def stop_replay(self):
+        self.eng.set_save_replay(False)
+
     def get_phase_times(self):
         return self.phase_times
 
