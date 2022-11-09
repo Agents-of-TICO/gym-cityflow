@@ -105,25 +105,27 @@ class CityFlowEnv(gym.Env):
 
     # Time in current phase relative to phase_step_goal
     def _get_reward_phase_time(self):
+        r_factor = 128
         reward = None
         if 2 <= self.steps_in_current_phase <= self.phase_step_goal:
             # If the same phase as last time is selected, give reward proportional to the number of steps we have been
-            # in the current stage.
-            reward = 128 * self.steps_in_current_phase
+            # in the current stage compared to the phase_step_goal, offering a smaller reward as steps_in_current_phase
+            # approaches phase_step_goal.
+            reward = r_factor * ((1 + self.phase_step_goal) - self.steps_in_current_phase)
         elif 2 > self.steps_in_current_phase:
             # If the phase was just changed, give a positive reward if the env spent more steps in the phase than
             # defined in self.phase_step_goal, decreasing the reward if the env exceeds the value in
             # self.phase_step_goal. If the env spends less time in a phase that the time given in self.phase_step_goal,
             # provide a negative reward proportional to difference.
             if self.phase_times[-1] >= self.phase_step_goal:
-                reward = 128 * self.phase_step_goal - 128 * (self.phase_times[-1] - self.phase_step_goal)
+                reward = r_factor * self.phase_step_goal - r_factor * (self.phase_times[-1] - self.phase_step_goal)
             else:
-                reward = -128 * (self.phase_step_goal - self.phase_times[-1])
+                reward = -r_factor * (self.phase_step_goal - self.phase_times[-1])
         else:
             # If the reward function gets here we have picked the same phase for more steps than is defined by
             # self.phase_step_goal, so we provide a negative reward proportional to the number of steps we exceed
             # self.phase_step_goal by
-            reward = -128 * (self.steps_in_current_phase - self.phase_step_goal)
+            reward = -r_factor * (self.steps_in_current_phase - self.phase_step_goal)
         return reward
 
     # One over Sum of waiting vehicles plus wait time
