@@ -208,10 +208,56 @@ class CityFlowEnv(gym.Env):
     def get_phase_times(self):
         return self.phase_times
 
+    def record_session_metrics(self):
+        
+
     def render(self):
         # Function called to render environment
-        print("Current time: " + str(self.eng.get_current_time()))
-        print("Running Total wait time: " + str(self.total_wait_time))
+        #print("Current time: " + str(self.eng.get_current_time()))
+        #print("Running Total wait time: " + str(self.total_wait_time))
+        
+        # In order to use the chart feature in the CityFlow simulator you have to create your
+        # own text file with the values to plot
+        f = open("ReplayLog.txt", "w")
+        # Writing the title of the chart in the first line
+        f.write("Average Speed of the Intersection" + '\n')
+
+        for i in range(0, self.episode_steps):
+            self.engine.next_step()
+            # since interval is 1 wait_time is sum of the number of vehicles waiting
+            wait_time += sum(self.engine.get_lane_waiting_vehicle_count().values())
+            # Takes the total speed of the vehicles in the intersection and divides it by the number of
+            # vehicles.
+            new_speed = sum(self.engine.get_vehicle_speed().values()) / self.engine.get_vehicle_count()
+            # Take the total number of waiting vehicles and divides it by the number of lanes to get
+            # current average queue length.
+            current_queue_length = sum(self.engine.get_lane_waiting_vehicle_count().values()) / 28
+            # For running averages we have to start with a number to average from and that is represented
+            # in the conditional below.
+            if(i == 1):
+                avg_speed = new_speed
+                avg_queue_length = current_queue_length
+            else:
+                avg_speed = (avg_speed + new_speed) / 2
+                avg_queue_length = (avg_queue_length + current_queue_length) / 2
+            # Writing the value to the file for the chart
+            f.write(str(avg_speed) + '\n')
+        # Throughput can be calculated by taking the number of vehicles subtracted by
+        # the number of waiting in the last phase
+        throughput = 2400 - sum(self.engine.get_lane_waiting_vehicle_count().values())
+        # We can calculate the average waiting time by dividing the total waiting time by the
+        # total number of vehicles.
+        avg_wait_time = wait_time / 2400
+        f.close()
+
+        print("Total Wait Time: " + str(wait_time))
+        print("Average Wait Time: " + str(avg_wait_time))
+        print("Total Throughput: " + str(throughput))
+        print("Average Throughput: " + str(throughput/num_steps))
+        print("Average Speed: " + str(avg_speed))
+        print("Average Queue Length per Lane: " + str(avg_queue_length))
+
+        
 
     def close(self):
         # if we need to do anything on env exit this is where we do it
