@@ -209,13 +209,12 @@ class CityFlowEnv(gym.Env):
         return self.phase_times
 
     def record_session_metrics(self):
-        
 
     def render(self):
         # Function called to render environment
         #print("Current time: " + str(self.eng.get_current_time()))
         #print("Running Total wait time: " + str(self.total_wait_time))
-        
+
         # In order to use the chart feature in the CityFlow simulator you have to create your
         # own text file with the values to plot
         f = open("ReplayLog.txt", "w")
@@ -253,7 +252,7 @@ class CityFlowEnv(gym.Env):
         print("Total Wait Time: " + str(wait_time))
         print("Average Wait Time: " + str(avg_wait_time))
         print("Total Throughput: " + str(throughput))
-        print("Average Throughput: " + str(throughput/num_steps))
+        print("Average Throughput: " + str(throughput/self.episode_steps))
         print("Average Speed: " + str(avg_speed))
         print("Average Queue Length per Lane: " + str(avg_queue_length))
 
