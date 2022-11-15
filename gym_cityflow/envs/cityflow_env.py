@@ -210,8 +210,15 @@ class CityFlowEnv(gym.Env):
 
     def render(self):
         # Function called to render environment
-        #print("Current time: " + str(self.eng.get_current_time()))
-        #print("Running Total wait time: " + str(self.total_wait_time))
+        
+        wait_time = 0
+        throughput = 0
+        avg_speed = 0
+        avg_wait_time = 0
+        current_wait_time = 0
+        new_speed = 0
+        avg_queue_length = 0
+        current_queue_length = 0
 
         # In order to use the chart feature in the CityFlow simulator you have to create your
         # own text file with the values to plot
