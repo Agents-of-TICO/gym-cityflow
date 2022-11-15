@@ -208,8 +208,6 @@ class CityFlowEnv(gym.Env):
     def get_phase_times(self):
         return self.phase_times
 
-    def record_session_metrics(self):
-
     def render(self):
         # Function called to render environment
         #print("Current time: " + str(self.eng.get_current_time()))
