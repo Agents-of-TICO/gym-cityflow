@@ -22,6 +22,19 @@ class CityFlowEnv(gym.Env):
         self.phase_times = []
         # self.reward_range = (-float("inf"), float(1))
 
+        self.wait_time = 0
+        self.throughput = 0
+        self.avg_speed = 0
+        self.avg_wait_time = 0
+        self.current_wait_time = 0
+        self.new_speed = 0
+        self.avg_queue_length = 0
+        self.current_queue_length = 0
+
+        self.f = open("ReplayLog.txt", "w")
+        # Writing the title of the chart in the first line
+        self.f.write("Average Speed of the Intersection" + '\n')
+
         assert reward_func in self.metadata["reward_funcs"]
         self.reward_func = reward_func
 
@@ -182,6 +195,33 @@ class CityFlowEnv(gym.Env):
         # add current wait time to total
         self.total_wait_time += sum(self.eng.get_lane_waiting_vehicle_count().values())*self.interval
 
+        # since interval is 1 wait_time is sum of the number of vehicles waiting
+        self.wait_time += sum(self.eng.get_lane_waiting_vehicle_count().values())
+        # Takes the total speed of the vehicles in the intersection and divides it by the number of
+        # vehicles.
+        self.new_speed = sum(self.eng.get_vehicle_speed().values()) / self.eng.get_vehicle_count()
+        # Take the total number of waiting vehicles and divides it by the number of lanes to get
+        # current average queue length.
+        self.current_queue_length = sum(self.eng.get_lane_waiting_vehicle_count().values()) / 28
+        # For running averages we have to start with a number to average from and that is represented
+        # in the conditional below.
+        #if(i == 1):
+        if self.current_step == 1:
+            self.avg_speed = self.new_speed
+            self.avg_queue_length = self.current_queue_length
+        else:
+            self.avg_speed = (self.avg_speed + self.new_speed) / 2
+            self.avg_queue_length = (self.avg_queue_length + self.current_queue_length) / 2
+        # Writing the value to the file for the chart
+        self.f.write(str(self.avg_speed) + '\n')
+
+        # Throughput can be calculated by taking the number of vehicles subtracted by
+        # the number of waiting in the last phase
+        self.throughput = 2400 - sum(self.eng.get_lane_waiting_vehicle_count().values())
+        # We can calculate the average waiting time by dividing the total waiting time by the
+        # total number of vehicles.
+        self.avg_wait_time = self.wait_time / 2400
+
         # An episode is done once we have simulated the number of steps defined in episode_steps
         terminated = self.episode_steps == self.current_step
         reward = self._get_reward()
@@ -210,63 +250,20 @@ class CityFlowEnv(gym.Env):
 
     def render(self):
         # Function called to render environment
-        
-        wait_time = 0
-        throughput = 0
-        avg_speed = 0
-        avg_wait_time = 0
-        current_wait_time = 0
-        new_speed = 0
-        avg_queue_length = 0
-        current_queue_length = 0
 
-        # In order to use the chart feature in the CityFlow simulator you have to create your
-        # own text file with the values to plot
-        f = open("ReplayLog.txt", "w")
-        # Writing the title of the chart in the first line
-        f.write("Average Speed of the Intersection" + '\n')
-
-        for i in range(0, self.episode_steps):
-            self.eng.next_step()
-            # since interval is 1 wait_time is sum of the number of vehicles waiting
-            wait_time += sum(self.eng.get_lane_waiting_vehicle_count().values())
-            # Takes the total speed of the vehicles in the intersection and divides it by the number of
-            # vehicles.
-            new_speed = sum(self.eng.get_vehicle_speed().values()) / self.eng.get_vehicle_count()
-            # Take the total number of waiting vehicles and divides it by the number of lanes to get
-            # current average queue length.
-            current_queue_length = sum(self.eng.get_lane_waiting_vehicle_count().values()) / 28
-            # For running averages we have to start with a number to average from and that is represented
-            # in the conditional below.
-            #if(i == 1):
-            if self.current_step == 1:
-                avg_speed = new_speed
-                avg_queue_length = current_queue_length
-            else:
-                avg_speed = (avg_speed + new_speed) / 2
-                avg_queue_length = (avg_queue_length + current_queue_length) / 2
-            # Writing the value to the file for the chart
-            f.write(str(avg_speed) + '\n')
-        # Throughput can be calculated by taking the number of vehicles subtracted by
-        # the number of waiting in the last phase
-        throughput = 2400 - sum(self.eng.get_lane_waiting_vehicle_count().values())
-        # We can calculate the average waiting time by dividing the total waiting time by the
-        # total number of vehicles.
-        avg_wait_time = wait_time / 2400
-        f.close()
-
-        print("Total Wait Time: " + str(wait_time))
-        print("Average Wait Time: " + str(avg_wait_time))
-        print("Total Throughput: " + str(throughput))
-        print("Average Throughput: " + str(throughput/self.episode_steps))
-        print("Average Speed: " + str(avg_speed))
-        print("Average Queue Length per Lane: " + str(avg_queue_length))
+        print("Total Wait Time: " + str(self.wait_time))
+        print("Average Wait Time: " + str(self.avg_wait_time))
+        print("Total Throughput: " + str(self.throughput))
+        print("Average Throughput: " + str(self.throughput/self.episode_steps))
+        print("Average Speed: " + str(self.avg_speed))
+        print("Average Queue Length per Lane: " + str(self.avg_queue_length))
         print ("\n")
 
         
 
     def close(self):
         # if we need to do anything on env exit this is where we do it
+        self.f.close()
         print("Total wait time: " + str(self.total_wait_time))
         if len(self.phase_times) > 0:
             print(f"Average phase time: {mean(self.phase_times)} seconds")
