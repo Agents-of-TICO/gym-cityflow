@@ -238,7 +238,8 @@ class CityFlowEnv(gym.Env):
             current_queue_length = sum(self.eng.get_lane_waiting_vehicle_count().values()) / 28
             # For running averages we have to start with a number to average from and that is represented
             # in the conditional below.
-            if(i == 1):
+            #if(i == 1):
+            if self.current_step == 1:
                 avg_speed = new_speed
                 avg_queue_length = current_queue_length
             else:
@@ -260,6 +261,7 @@ class CityFlowEnv(gym.Env):
         print("Average Throughput: " + str(throughput/self.episode_steps))
         print("Average Speed: " + str(avg_speed))
         print("Average Queue Length per Lane: " + str(avg_queue_length))
+        print ("\n")
 
         
 
