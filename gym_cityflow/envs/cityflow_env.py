@@ -105,7 +105,7 @@ class CityFlowEnv(gym.Env):
 
     # Time in current phase relative to phase_step_goal
     def _get_reward_phase_time(self):
-        r_factor = 128
+        r_factor = 2
         reward = None
         if 2 <= self.steps_in_current_phase <= self.phase_step_goal:
             # If the same phase as last time is selected, give reward proportional to the number of steps we have been
