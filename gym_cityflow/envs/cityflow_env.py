@@ -189,9 +189,6 @@ class CityFlowEnv(gym.Env):
         observation = self._get_obs()
         info = self._get_info()
 
-        if self.render_mode is not None and self.rendering:
-            self.render()
-
         # The Newest version of gym has info returned w/ reset but this causes issues with stable baselines 3
         return observation # , info
 
