@@ -1,4 +1,5 @@
 from statistics import mean
+import datetime
 
 import gym
 from gym import spaces
@@ -7,11 +8,12 @@ import json
 
 
 class CityFlowEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array", "plot"], "max_waiting": 128,
+    metadata = {"render_modes": ["human", "file", "plot"], "max_waiting": 128,
                 "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "queue&TimeF", "avgSpeed", "phaseTime"]
+                "data_funcs": ["waitTime", "avgSpeed", "avgSpeed"]
                 }
 
-    def __init__(self, config_path, episode_steps=10000, num_threads=1, reward_func="queueSum", render_mode=None):
+    def __init__(self, config_path, episode_steps=10000, num_threads=1, reward_func="queueSum", data_to_collect=None, render_mode=None):
         self.episode_steps = episode_steps  # The number of steps to simulate
         self.current_step = 0
         self.total_wait_time = 0
@@ -20,6 +22,7 @@ class CityFlowEnv(gym.Env):
         self.config_path = config_path
         self.num_threads = num_threads
         self.phase_times = []
+        self.data_file_name = None
         # self.reward_range = (-float("inf"), float(1))
 
         assert reward_func in self.metadata["reward_funcs"]
@@ -34,6 +37,12 @@ class CityFlowEnv(gym.Env):
                                  }
 
         print(f"Using reward function: {self.reward_func_dict[reward_func].__name__}")
+
+        self.data_func_dict = {"waitTime": self._get_wait_time,
+                                 "avgSpeed": self._get_avg_speed,
+                                 "avgQueue": self._get_avg_queue
+                                 }
+
         # open cityflow config file into dict
         self.configDict = json.load(open(config_path))
         self.interval = self.configDict['interval']
@@ -68,6 +77,13 @@ class CityFlowEnv(gym.Env):
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
+
+        if data_to_collect is None:
+            self.data_funcs = None
+        else:
+            for value in data_to_collect:
+                assert value in self.metadata["data_funcs"]
+            self.data_funcs = data_to_collect
 
     def _get_obs(self):
         return self.eng.get_lane_waiting_vehicle_count()
@@ -147,12 +163,13 @@ class CityFlowEnv(gym.Env):
         self.phase_times = []
         self.steps_in_current_phase = 0
         self.last_action = 0
+        self.data_file_name = None
 
         observation = self.eng.get_lane_waiting_vehicle_count()
         info = self._get_info()
 
-        if self.render_mode != None:
-            self.render(self.render_mode)
+        if self.render_mode is not None:
+            self.render()
 
         # The Newest version of gym has info returned w/ reset but this causes issues with stable baselines 3
         return observation # , info
@@ -189,8 +206,8 @@ class CityFlowEnv(gym.Env):
         info = self._get_info()
         truncated = False
 
-        if self.render_mode != None:
-            self.render(self.render_mode)
+        if self.render_mode is not None:
+            self.render()
 
         # Update last action taken
         self.last_action = action
@@ -208,70 +225,65 @@ class CityFlowEnv(gym.Env):
     def get_phase_times(self):
         return self.phase_times
 
-    def render(self, render_mode):
+    def render(self):
         # Function called to render environment
-        if render_mode == "human":
-            wait_time = 0
-            throughput = 0
-            avg_speed = 0
-            avg_wait_time = 0
-            current_wait_time = 0
-            new_speed = 0
-            avg_queue_length = 0
-            current_queue_length = 0
+        if self.render_mode == "human":
+            data = self._collect_data()
+            for i in range(len(self.data_funcs)):
+                print(self.data_funcs[i] + ": " + data[i])
 
-            # In order to use the chart feature in the CityFlow simulator you have to create your
-            # own text file with the values to plot
-            f = open("ReplayLog.txt", "w")
-            # Writing the title of the chart in the first line
-            f.write("Average Speed of the Intersection" + '\n')
+        if self.render_mode == "file":
+            if self.data_file_name is None:
+                self.data_file_name = "data_" + str(datetime.datetime.now()).split(".")[0] + '.csv'
+                file = open(self.data_file_name, "a")
+                # Write in the headers since we are creating a new file
+                for i in range(len(self.data_funcs)):
+                    file.write(self.data_funcs[i] + ", ")
+                file.write('\n')
+            else:
+                file = open(self.data_file_name, "a")
 
-            for i in range(0, self.episode_steps):
-                self.eng.next_step()
-                # since interval is 1 wait_time is sum of the number of vehicles waiting
-                wait_time += sum(self.eng.get_lane_waiting_vehicle_count().values())
-                # Takes the total speed of the vehicles in the intersection and divides it by the number of
-                # vehicles.
-                new_speed = sum(self.eng.get_vehicle_speed().values()) / self.eng.get_vehicle_count()
-                # Take the total number of waiting vehicles and divides it by the number of lanes to get
-                # current average queue length.
-                current_queue_length = sum(self.eng.get_lane_waiting_vehicle_count().values()) / 28
+            # Write the current steps data to file as one row
+            data = self._collect_data()
+            for i in range(len(self.data_funcs)):
+                file.write(data[i] + ", ")
+            file.write('\n')
+            file.close()
+            for i in range(len(self.data_funcs)):
+                print(self.data_funcs[i] + ": " + data[i])
 
-                if i % 10 == 0:
+        if self.render_mode == "plot":
+            q_len_arr = [] # array of queue lengths to plot
 
-                # For running averages we have to start with a number to average from and that is represented
-                # in the conditional below.
-                if(i == 1):
-                    avg_speed = new_speed
-                    avg_queue_length = current_queue_length
-                else:
-                    avg_speed = (avg_speed + new_speed) / 2
-                    avg_queue_length = (avg_queue_length + current_queue_length) / 2
-                # Writing the value to the file for the chart
-                f.write(str(avg_speed) + '\n')
-            # Throughput can be calculated by taking the number of vehicles subtracted by
-            # the number of waiting in the last phase
-            throughput = 2400 - sum(self.eng.get_lane_waiting_vehicle_count().values())
-            # We can calculate the average waiting time by dividing the total waiting time by the
-            # total number of vehicles.
-            avg_wait_time = wait_time / 2400
-            f.close()
+    def _collect_data(self):
+        data = [None] * len(self.data_funcs)
+        for i in range(len(data)):
+            data[i] = self.data_func_dict[self.data_funcs[i]]()
+        return data
 
-            print("Total Wait Time: " + str(wait_time))
-            print("Average Wait Time: " + str(avg_wait_time))
-            print("Total Throughput: " + str(throughput))
-            print("Average Throughput: " + str(throughput/self.episode_steps))
-            print("Average Speed: " + str(avg_speed))
-            print("Average Queue Length per Lane: " + str(avg_queue_length))
+    def _get_wait_time(self):
+        # Number of waiting vehicles in current step multiplied by the step interval in seconds
+        return sum(self.eng.get_lane_waiting_vehicle_count().values()) * self.interval
 
-        if render_mode == "plot":
-            q_len_arr = [] # array of queue lengths to plot 
-        
+    def _get_avg_speed(self):
+        # Takes the total speed of the vehicles in the intersection and divides it by the number of vehicles.
+        return sum(self.eng.get_vehicle_speed().values()) / self.eng.get_vehicle_count()
+
+    def _get_avg_queue(self):
+        # Take the total number of waiting vehicles and divides it by the number of lanes to get
+        # current average queue length.
+        queues = self.eng.get_lane_waiting_vehicle_count().values()
+        # Since get_lane_waiting_vehicle_count() also returns queues for outgoing lanes we divide the length of the
+        # array by 2 to get number of incoming lanes. This is only valid in the case of symmetric intersections
+        return sum(queues) / (len(queues) / 2)
+
+    def get_avg_travel_time(self):
+        return self.eng.get_average_travel_time()
 
     def close(self):
         # if we need to do anything on env exit this is where we do it
-        print("Total wait time: " + str(self.total_wait_time))
-        if len(self.phase_times) > 0:
-            print(f"Average phase time: {mean(self.phase_times)} seconds")
-        print("Exiting...")
-        print("Total wait time: " + str(self.total_wait_time))
+        if self.render_mode == "human":
+            print("Total wait time: " + str(self.total_wait_time))
+            if len(self.phase_times) > 0:
+                print(f"Average phase time: {mean(self.phase_times)} seconds")
+            print("Closing...")
