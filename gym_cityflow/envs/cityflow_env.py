@@ -1,3 +1,5 @@
+import sys
+import random
 from statistics import mean
 import datetime
 
@@ -13,12 +15,14 @@ class CityFlowEnv(gym.Env):
                 "data_funcs": ["waitTime", "avgSpeed", "avgSpeed"]
                 }
 
-    def __init__(self, config_path, episode_steps=10000, num_threads=1, reward_func="queueSum", data_to_collect=None, render_mode=None):
+    def __init__(self, config_path, episode_steps=10000, num_threads=1, reward_func="queueSum", seed=None,
+                 data_to_collect=None, render_mode=None):
         self.episode_steps = episode_steps  # The number of steps to simulate
         self.current_step = 0
         self.total_wait_time = 0
         self.phase_step_goal = 24
-        self.transition_phase_time = 3
+        self.transition_phase_time = 5
+        self.max_phase_time = 64
         self.config_path = config_path
         self.num_threads = num_threads
         self.phase_times = []
@@ -61,20 +65,26 @@ class CityFlowEnv(gym.Env):
         # space since each intersection has a number of actions equal to the number of states/phases the
         # intersection has. Here we also generate a dictionary to get the id of an intersection given an index
         # Subtract one to remove yellow phase from action space
-        self.intersection_phases = len(intersection['trafficLight']['lightphases']) - 1
-        self.action_space = spaces.Discrete(self.intersection_phases)
+        self.num_phases = len(intersection['trafficLight']['lightphases']) - 1
+        self.action_space = spaces.Discrete(self.num_phases)
         self._intersection_id = intersection['id']
 
         # create cityflow engine
         self.eng = cityflow.Engine(config_path, thread_num=num_threads)
+
+        # set seed if given
+        if seed is not None:
+            self.eng.set_random_seed(seed)
 
         # Observations are dictionaries containing the number of waiting vehicles in each lane in the simulation.
         # Maximum number of waiting vehicles in each lane is defined by the "max_waiting" metadata parameter
         observation_space_dict = self.eng.get_lane_waiting_vehicle_count()
         for key in observation_space_dict:
             observation_space_dict[key] = spaces.Discrete(self.metadata["max_waiting"])
+        observation_space_dict["steps_in_phase"] = spaces.Discrete(self.max_phase_time + 1)
         self.observation_space = spaces.Dict(observation_space_dict)
 
+        # Verify and set render mode
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
 
@@ -86,7 +96,11 @@ class CityFlowEnv(gym.Env):
             self.data_funcs = data_to_collect
 
     def _get_obs(self):
-        return self.eng.get_lane_waiting_vehicle_count()
+        # Get Dictionary where keys are lane id's and values are the # of waiting vehicles in the lane
+        obs = self.eng.get_lane_waiting_vehicle_count()
+        # Add steps in current phase to dictionary
+        obs["steps_in_phase"] = self.steps_in_current_phase
+        return obs
 
     def _get_info(self):
         return {"steps_in_current_phase": self.steps_in_current_phase,
@@ -106,25 +120,27 @@ class CityFlowEnv(gym.Env):
 
     # Time in current phase relative to phase_step_goal
     def _get_reward_phase_time(self):
+        r_factor = 2
         reward = None
         if 2 <= self.steps_in_current_phase <= self.phase_step_goal:
             # If the same phase as last time is selected, give reward proportional to the number of steps we have been
-            # in the current stage.
-            reward = 128 * self.steps_in_current_phase
+            # in the current stage compared to the phase_step_goal, offering a smaller reward as steps_in_current_phase
+            # approaches phase_step_goal.
+            reward = r_factor * ((1 + self.phase_step_goal) - self.steps_in_current_phase)
         elif 2 > self.steps_in_current_phase:
             # If the phase was just changed, give a positive reward if the env spent more steps in the phase than
             # defined in self.phase_step_goal, decreasing the reward if the env exceeds the value in
             # self.phase_step_goal. If the env spends less time in a phase that the time given in self.phase_step_goal,
             # provide a negative reward proportional to difference.
             if self.phase_times[-1] >= self.phase_step_goal:
-                reward = 128 * self.phase_step_goal - 128 * (self.phase_times[-1] - self.phase_step_goal)
+                reward = r_factor * self.phase_step_goal - r_factor * (self.phase_times[-1] - self.phase_step_goal)
             else:
-                reward = -128 * (self.phase_step_goal - self.phase_times[-1])
+                reward = -r_factor * (self.phase_step_goal - self.phase_times[-1])
         else:
             # If the reward function gets here we have picked the same phase for more steps than is defined by
             # self.phase_step_goal, so we provide a negative reward proportional to the number of steps we exceed
             # self.phase_step_goal by
-            reward = -128 * (self.steps_in_current_phase - self.phase_step_goal)
+            reward = -r_factor * (self.steps_in_current_phase - self.phase_step_goal)
         return reward
 
     # One over Sum of waiting vehicles plus wait time
@@ -165,7 +181,7 @@ class CityFlowEnv(gym.Env):
         self.last_action = 0
         self.data_file_name = None
 
-        observation = self.eng.get_lane_waiting_vehicle_count()
+        observation = self._get_obs()
         info = self._get_info()
 
         if self.render_mode is not None:
@@ -179,16 +195,17 @@ class CityFlowEnv(gym.Env):
         # (phase: 0) for self.transition_phase_time before changing to new phase
         action += 1  # increment selected phase by one since 0 is yellow phase
 
+        # If we reach or exceed the maximum phase time allowed switch to a random phase
+        if self.steps_in_current_phase >= self.max_phase_time and self.last_action == action:
+            actions = [*range(1, self.num_phases + 1)]
+            actions.remove(self.last_action)
+            action = random.choice(actions)
+
         # If we are in the same phase as last time increment the relevant value in steps_in_current_phase
         if self.last_action == action:
             self.steps_in_current_phase += 1
         else:
-            self.eng.set_tl_phase(self._intersection_id, 0)
-            self.phase_times.append(self.steps_in_current_phase)
-            for i in range(self.transition_phase_time):
-                self.eng.next_step()
-            self.eng.set_tl_phase(self._intersection_id, action)
-            self.steps_in_current_phase = 1
+            self._transition_phase(action)
 
         # Step the CityFlow env
         self.eng.next_step()
@@ -218,9 +235,29 @@ class CityFlowEnv(gym.Env):
         # to account for these changes
         # return observation, reward, terminated, truncated, info
 
+    def _transition_phase(self, next_phase):
+        # Switch to the given phase after taking a predefined number of steps in a 'red'/transition phase
+
+        # Set intersection to intermediate phase and take self.steps_in_current_phase steps
+        self.eng.set_tl_phase(self._intersection_id, 0)
+        for i in range(self.transition_phase_time):
+            self.eng.next_step()
+        # Switch to given phase
+        self.eng.set_tl_phase(self._intersection_id, next_phase)
+
+        # Record and reset self.steps_in_current_phase
+        self.phase_times.append(self.steps_in_current_phase)
+        self.steps_in_current_phase = 1
+
     def load_fresh_engine(self):
         # Recreate the engine with the same params to generate fresh replay file
         self.eng = cityflow.Engine(self.config_path, thread_num=self.num_threads)
+
+    def start_replay(self):
+        self.eng.set_save_replay(True)
+
+    def stop_replay(self):
+        self.eng.set_save_replay(False)
 
     def get_phase_times(self):
         return self.phase_times
