@@ -279,7 +279,7 @@ class CityFlowEnv(gym.Env):
                 file = open(self.data_file_name, "a")
                 # Write in the headers since we are creating a new file
                 for i in range(len(self.data_funcs)):
-                    file.write(self.data_funcs[i] + ", ")
+                    file.write(str(self.data_funcs[i]) + ", ")
                 file.write('\n')
             else:
                 file = open(self.data_file_name, "a")
