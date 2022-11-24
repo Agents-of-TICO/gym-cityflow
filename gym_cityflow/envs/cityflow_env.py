@@ -287,7 +287,7 @@ class CityFlowEnv(gym.Env):
             # Write the current steps data to file as one row
             data = self._collect_data()
             for i in range(len(self.data_funcs)):
-                file.write(data[i] + ", ")
+                file.write(str(data[i]) + ", ")
             file.write('\n')
             file.close()
             for i in range(len(self.data_funcs)):
