@@ -27,7 +27,7 @@ class CityFlowEnv(gym.Env):
         self.num_threads = num_threads
         self.phase_times = []
         self.data_file_name = None
-        self.render = False
+        self.rendering = False
         # self.reward_range = (-float("inf"), float(1))
 
         assert reward_func in self.metadata["reward_funcs"]
@@ -189,7 +189,7 @@ class CityFlowEnv(gym.Env):
         observation = self._get_obs()
         info = self._get_info()
 
-        if self.render_mode is not None and self.render:
+        if self.render_mode is not None and self.rendering:
             self.render()
 
         # The Newest version of gym has info returned w/ reset but this causes issues with stable baselines 3
@@ -228,7 +228,7 @@ class CityFlowEnv(gym.Env):
         info = self._get_info()
         truncated = False
 
-        if self.render_mode is not None and self.render:
+        if self.render_mode is not None and self.rendering:
             self.render()
 
         # Update last action taken
@@ -327,10 +327,10 @@ class CityFlowEnv(gym.Env):
         return self.eng.get_average_travel_time()
 
     def start_rendering(self):
-        self.render = True
+        self.rendering = True
 
     def stop_rendering(self):
-        self.render = False
+        self.rendering = False
 
     def close(self):
         # if we need to do anything on env exit this is where we do it
