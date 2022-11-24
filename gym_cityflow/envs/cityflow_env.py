@@ -162,7 +162,7 @@ class CityFlowEnv(gym.Env):
     # Average Speed reward function
     def _get_reward_avg_speed(self):
         num_vehicles = self.eng.get_vehicle_count()
-        if num_vehicles != 0:
+        if num_vehicles == 0:
             return 0
         else:
             return (sum(self.eng.get_vehicle_speed().values()) / 16.67) / num_vehicles
@@ -309,10 +309,10 @@ class CityFlowEnv(gym.Env):
     def _get_avg_speed(self):
         # Takes the total speed of the vehicles in the intersection and divides it by the number of vehicles.
         num_vehicles = self.eng.get_vehicle_count()
-        if num_vehicles != 0:
+        if num_vehicles == 0:
             return 0
         else:
-            return sum(self.eng.get_vehicle_speed().values()) / self.eng.get_vehicle_count()
+            return sum(self.eng.get_vehicle_speed().values()) / num_vehicles
 
     def _get_avg_queue(self):
         # Take the total number of waiting vehicles and divides it by the number of lanes to get
