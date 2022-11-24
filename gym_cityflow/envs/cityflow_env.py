@@ -271,7 +271,7 @@ class CityFlowEnv(gym.Env):
         if self.render_mode == "human":
             data = self._collect_data()
             for i in range(len(self.data_funcs)):
-                print(self.data_funcs[i] + ": " + data[i])
+                print(self.data_funcs[i] + ": " + str(data[i]))
 
         if self.render_mode == "file":
             if self.data_file_name is None:
@@ -291,7 +291,7 @@ class CityFlowEnv(gym.Env):
             file.write('\n')
             file.close()
             for i in range(len(self.data_funcs)):
-                print(self.data_funcs[i] + ": " + data[i])
+                print(self.data_funcs[i] + ": " + str(data[i]))
 
         if self.render_mode == "plot":
             q_len_arr = [] # array of queue lengths to plot
