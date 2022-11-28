@@ -173,7 +173,7 @@ class CityFlowEnv(gym.Env):
 
     def _get_reward_combo(self):
         reward = self._get_reward_phase_time()
-        reward += self._get_reward_queue_sum()
+        reward += 2 * self._get_reward_queue_sum()
         return reward
 
     def reset(self, seed=None, options=None):
