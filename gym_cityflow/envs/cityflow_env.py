@@ -11,7 +11,8 @@ import json
 
 class CityFlowEnv(gym.Env):
     metadata = {"render_modes": ["human", "file", "plot"], "max_waiting": 128,
-                "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "queue&TimeF", "avgSpeed", "phaseTime"],
+                "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "queue&TimeF", "avgSpeed",
+                                 "phaseTime", "combo"],
                 "data_funcs": ["waitTime", "avgSpeed", "avgSpeed"]
                 }
 
@@ -38,7 +39,8 @@ class CityFlowEnv(gym.Env):
                                  "avgSpeed": self._get_reward_avg_speed,
                                  "queue&Time": self._get_reward_sum_and_phase_time,
                                  "queue&TimeF": self._get_reward_sum_and_phase_time_flat,
-                                 "phaseTime": self._get_reward_phase_time
+                                 "phaseTime": self._get_reward_phase_time,
+                                 "combo": self._get_reward_combo
                                  }
 
         print(f"Using reward function: {self.reward_func_dict[reward_func].__name__}")
@@ -122,7 +124,8 @@ class CityFlowEnv(gym.Env):
     # Time in current phase relative to phase_step_goal
     def _get_reward_phase_time(self):
         r_factor = 2
-        reward = None
+        reward = None   # Value between r_factor * (self.max_phase_time - self.phase_step_goal) and
+        # r_factor * self.phase_step_goal
         if 2 <= self.steps_in_current_phase <= self.phase_step_goal:
             # If the same phase as last time is selected, give reward proportional to the number of steps we have been
             # in the current stage compared to the phase_step_goal, offering a smaller reward as steps_in_current_phase
@@ -167,6 +170,11 @@ class CityFlowEnv(gym.Env):
             return 0
         else:
             return (sum(self.eng.get_vehicle_speed().values()) / 16.67) / num_vehicles
+
+    def _get_reward_combo(self):
+        reward = self._get_reward_phase_time()
+        reward += self._get_reward_queue_sum()
+        return reward
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
