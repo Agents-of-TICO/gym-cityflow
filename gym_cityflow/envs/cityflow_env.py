@@ -13,7 +13,7 @@ class CityFlowEnv(gym.Env):
     metadata = {"render_modes": ["human", "file", "plot"], "max_waiting": 128,
                 "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "queue&TimeF", "avgSpeed",
                                  "phaseTime", "combo"],
-                "data_funcs": ["waitTime", "avgSpeed", "avgSpeed"]
+                "data_funcs": ["waitTime", "avgSpeed", "avgQueue"]
                 }
 
     def __init__(self, config_path, episode_steps=10000, num_threads=1, reward_func="queueSum", seed=None,
@@ -173,7 +173,7 @@ class CityFlowEnv(gym.Env):
 
     def _get_reward_combo(self):
         reward = self._get_reward_phase_time()
-        reward += 2 * self._get_reward_queue_sum()
+        reward += 12 * self._get_reward_queue_sum()
         return reward
 
     def reset(self, seed=None, options=None):
