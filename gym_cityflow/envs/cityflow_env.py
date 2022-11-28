@@ -7,13 +7,14 @@ import json
 
 
 class CityFlowEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "max_waiting": 64}
+    metadata = {"render_modes": ["human", "rgb_array"], "max_waiting": 128}
 
     def __init__(self, config_path, episode_steps=10000, num_threads=1, render_mode=None):
         self.episode_steps = episode_steps  # The number of steps to simulate
         self.current_step = 0
         self.total_wait_time = 0
         self.min_phase_time = 24
+        self.transition_phase_time = 3
         self.phase_times = []
         # self.reward_range = (-float("inf"), float(1))
 
@@ -27,18 +28,19 @@ class CityFlowEnv(gym.Env):
         # Get list of non-virtual intersections
         intersections = list(filter(lambda val: not val['virtual'], self.roadnetDict['intersections']))
 
+        # Initialize
+        self.steps_in_current_phase = [0]*len(intersections)
+        self.last_action = [0]*len(intersections)
+
         # Get number of available phases available in each intersection and use it to create the action
         # space since each intersection has a number of actions equal to the number of states/phases the
         # intersection has. Here we also generate a dictionary to get the id of an intersection given an index
         intersection_phases = [None]*len(intersections)
-        self.steps_since_phase_change = [None]*len(intersections)
-        self.last_action = [None]*len(intersections)
         index_to_intersection_id = {}
         for i, intersection in enumerate(intersections):
-            intersection_phases[i] = len(intersection['trafficLight']['lightphases'])
+            # Subtract one to remove yellow phase from action space
+            intersection_phases[i] = len(intersection['trafficLight']['lightphases']) - 1
             index_to_intersection_id[i] = intersection['id']
-            self.steps_since_phase_change[i] = 0
-            self.last_action[i] = 0
         self.action_space = spaces.MultiDiscrete(intersection_phases)
         self._index_to_intersection_id = index_to_intersection_id
 
@@ -59,26 +61,19 @@ class CityFlowEnv(gym.Env):
         return self.eng.get_lane_waiting_vehicle_count()
 
     def _get_info(self):
-        return {"steps_since_phase_change": self.steps_since_phase_change,
+        return {"steps_in_current_phase": self.steps_in_current_phase,
                 "last_action": self.last_action
                 }
 
-    def _get_reward(self, action):
+    def _get_reward(self):
         num_waiting = sum(self.eng.get_lane_waiting_vehicle_count().values())
-        reward = 1 / (num_waiting + 1)  # value between 0 and 1
-
-        # reward picking the same phase multiple times and punish simulation for changing phases too quickly
-        for i in range(len(action)):
-            if self.last_action[i] == action[i]:
-                reward += self.min_phase_time / self.steps_since_phase_change[i]
-            elif self.steps_since_phase_change[i] < self.min_phase_time:
-                reward -= (self.min_phase_time + 1) / (self.steps_since_phase_change[i] + 1)
+        reward = -num_waiting  # Negate the value since we want higher values to represent better performance
 
         return reward
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
-        super().reset(seed=seed)
+        # super().reset(seed=seed)
 
         print("Total wait time: " + str(self.total_wait_time))
         if len(self.phase_times) > 0:
@@ -90,8 +85,8 @@ class CityFlowEnv(gym.Env):
         self.current_step = 0
         self.total_wait_time = 0
         self.phase_times = []
-        for i in range(len(self.steps_since_phase_change)):
-            self.steps_since_phase_change[i] = 0
+        for i in range(len(self.steps_in_current_phase)):
+            self.steps_in_current_phase[i] = 0
             self.last_action[i] = 0
 
         observation = self.eng.get_lane_waiting_vehicle_count()
@@ -108,14 +103,28 @@ class CityFlowEnv(gym.Env):
         if len(action) != len(self._index_to_intersection_id):
             raise Warning('Action length not equal to number of intersections')
 
-        # Set each traffic light phase to specified action
+        # Set each traffic light phase to specified action. If a change in phase is requested, go to 'yellow' phase
+        # (phase: 0) for self.transition_phase_time before changing to new phase
         for i, phase in enumerate(action):
-            self.eng.set_tl_phase(self._index_to_intersection_id[i], phase)
-            if self.last_action[i] == phase:
-                self.steps_since_phase_change[i] += 1
+            phase += 1  # increment selected phase by one since 0 is yellow phase
+
+            # If we are in the same phase as last time increment the relevant value in steps_in_current_phase
+            if self.last_action[i] == 0 and self.steps_in_current_phase[i] < self.transition_phase_time:
+                phase = 0    # Once we go to the 'all-red' state stay there for transition_phase_time steps
+                self.steps_in_current_phase[i] += 1
+            elif self.last_action[i] == 0:
+                self.eng.set_tl_phase(self._index_to_intersection_id[i], phase)
+                self.steps_in_current_phase[i] = 1
+            elif self.last_action[i] == phase:
+                self.steps_in_current_phase[i] += 1
             else:
-                self.phase_times.append(self.steps_since_phase_change[i])
-                self.steps_since_phase_change[i] = 0
+                phase = 0
+                self.eng.set_tl_phase(self._index_to_intersection_id[i], phase)
+                self.phase_times.append(self.steps_in_current_phase[i])
+                self.steps_in_current_phase[i] = 1
+
+            # Write any changes we made to selected phase to the 'action' array
+            action[i] = phase
 
         # Step the CityFlow env
         self.eng.next_step()
@@ -128,7 +137,7 @@ class CityFlowEnv(gym.Env):
 
         # An episode is done once we have simulated the number of steps defined in episode_steps
         terminated = self.episode_steps == self.current_step
-        reward = self._get_reward(action)
+        reward = self._get_reward()
         observation = self._get_obs()
         info = self._get_info()
         truncated = False
