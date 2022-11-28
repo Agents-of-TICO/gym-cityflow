@@ -17,6 +17,3 @@ class RenderPlot:
         plt.xlabel(self.xlab)
         plt.ylabel(self.ylab)
         plt.savefig(file_name, format='png')
-
-
-
