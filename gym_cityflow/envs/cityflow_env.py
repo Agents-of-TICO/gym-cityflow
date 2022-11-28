@@ -6,8 +6,9 @@ import cityflow
 import json
 
 
+
 class CityFlowEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "max_waiting": 128,
+    metadata = {"render_modes": ["human", "rgb_array", "plot"], "max_waiting": 128,
                 "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "queue&TimeF", "avgSpeed", "phaseTime"]
                 }
 
@@ -164,8 +165,8 @@ class CityFlowEnv(gym.Env):
         observation = self.eng.get_lane_waiting_vehicle_count()
         info = self._get_info()
 
-        if self.render_mode == "human":
-            self.render()
+        if self.render_mode != None:
+            self.render(self.render_mode)
 
         # The Newest version of gym has info returned w/ reset but this causes issues with stable baselines 3
         return observation # , info
@@ -229,8 +230,8 @@ class CityFlowEnv(gym.Env):
         info = self._get_info()
         truncated = False
 
-        if self.render_mode == "human":
-            self.render()
+        if self.render_mode != None:
+            self.render(self.render_mode)
 
         # Update last action taken
         self.last_action = action
@@ -248,18 +249,76 @@ class CityFlowEnv(gym.Env):
     def get_phase_times(self):
         return self.phase_times
 
-    def render(self):
+    def render(self, render_mode):
+        wait_time = 0
+        throughput = 0
+        avg_speed = 0
+        avg_wait_time = 0
+        current_wait_time = 0
+        new_speed = 0
+        avg_queue_length = 0
+        current_queue_length = 0
+
+        wait_time_arr = [] 
+        throughput_arr = []
+        avg_speed_arr = []
+        avg_wait_time_arr = []
+        queue_length_arr = []
         # Function called to render environment
 
-        print("Total Wait Time: " + str(self.wait_time))
-        print("Average Wait Time: " + str(self.avg_wait_time))
-        print("Total Throughput: " + str(self.throughput))
-        print("Average Throughput: " + str(self.throughput/self.episode_steps))
-        print("Average Speed: " + str(self.avg_speed))
-        print("Average Queue Length per Lane: " + str(self.avg_queue_length))
-        print ("\n")
+        if render_mode == "human":
+            # In order to use the chart feature in the CityFlow simulator you have to create your
+            # own text file with the values to plot
+            f = open("ReplayLog.txt", "w")
+            # Writing the title of the chart in the first line
+            f.write("Average Speed of the Intersection" + '\n')
 
-        
+            for i in range(0, self.episode_steps):
+                self.eng.next_step()
+                # since interval is 1 wait_time is sum of the number of vehicles waiting
+                wait_time += sum(self.eng.get_lane_waiting_vehicle_count().values())
+
+                # Takes the total speed of the vehicles in the intersection and divides it by the number of
+                # vehicles.
+                new_speed = sum(self.eng.get_vehicle_speed().values()) / self.eng.get_vehicle_count()
+                # Take the total number of waiting vehicles and divides it by the number of lanes to get
+                # current average queue length.
+                current_queue_length = sum(self.eng.get_lane_waiting_vehicle_count().values()) / 28
+
+                #if (i % 10 == 0):
+                # For running averages we have to start with a number to average from and that is represented
+                # in the conditional below.
+                if(i == 1):
+                    avg_speed = new_speed
+                    avg_queue_length = current_queue_length
+                else:
+                    avg_speed = (avg_speed + new_speed) / 2
+                    avg_queue_length = (avg_queue_length + current_queue_length) / 2
+                # Writing the value to the file for the chart
+                f.write(str(avg_speed) + '\n')
+            # Throughput can be calculated by taking the number of vehicles subtracted by
+            # the number of waiting in the last phase
+            throughput = 2400 - sum(self.eng.get_lane_waiting_vehicle_count().values())
+            # We can calculate the average waiting time by dividing the total waiting time by the
+            # total number of vehicles.
+            avg_wait_time = wait_time / 2400
+            f.close()
+
+            print("Total Wait Time: " + str(wait_time))
+            print("Average Wait Time: " + str(avg_wait_time))
+            print("Total Throughput: " + str(throughput))
+            print("Average Throughput: " + str(throughput/self.episode_steps))
+            print("Average Speed: " + str(avg_speed))
+            print("Average Queue Length per Lane: " + str(avg_queue_length))
+
+        if render_mode == "plot":
+            for i in range(0, self.episode_steps):
+                self.eng.next_step()
+                # Take the total number of waiting vehicles and divides it by the number of lanes to get
+                # current average queue length.
+                current_queue_length = sum(self.eng.get_lane_waiting_vehicle_count().values()) / 28
+                queue_length_arr += [current_queue_length]
+                self.metric_array = queue_length_arr
 
     def close(self):
         # if we need to do anything on env exit this is where we do it
