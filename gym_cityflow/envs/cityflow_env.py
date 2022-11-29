@@ -300,7 +300,7 @@ class CityFlowEnv(gym.Env):
                 print(self.data_funcs[i] + ": " + str(data[i]))
 
         if self.render_mode == "plot":
-            q_len_arr = []      # array of queue lengths to plot
+            self.data_arr = [[None]] * (len(self.data_funcs))
 
     def _collect_data(self):
         data = [None] * len(self.data_funcs)
