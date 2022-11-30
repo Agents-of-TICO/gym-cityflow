@@ -10,8 +10,7 @@ class RenderPlot:
         self.xlab = str(plt_xlabel)
         self.ylab = str(plt_ylabel)
 
-    def export_plot(self):
-        file_name = self.title + "_graph"
+    def export_plot(self, file_name):
         graph = plt.plot(self._plot_array)
         plt.title(self.title)
         plt.xlabel(self.xlab)
