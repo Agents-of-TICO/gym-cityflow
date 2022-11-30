@@ -106,6 +106,10 @@ class CityFlowEnv(gym.Env):
                 assert value in self.metadata["data_funcs"]
             self.data_funcs = data_to_collect
 
+        if not self.data_arr: #if array is empty
+            for i in range(len(self.data_funcs)):
+                self.data_arr.append([])
+
     def _get_obs(self):
         # Get Dictionary where keys are lane id's and values are the # of waiting vehicles in the lane
         obs = self.eng.get_lane_waiting_vehicle_count()
@@ -308,12 +312,10 @@ class CityFlowEnv(gym.Env):
                 print(self.data_funcs[i] + ": " + str(data[i]))
 
         if self.render_mode == "plot":
-            if not self.data_arr: #if array is empty
-                for i in range(len(self.data_funcs)):
-                    self.data_arr.append([])
             data = self._collect_data()
             for i, n in enumerate(data):
                 self.data_arr[i].append(n)
+                
      
 
     def _collect_data(self):

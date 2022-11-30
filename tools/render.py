@@ -11,8 +11,11 @@ class RenderPlot:
         self.ylab = str(plt_ylabel)
 
     def export_plot(self, file_name):
-        graph = plt.plot(self._plot_array)
+        fig = plt.figure()
+        graph = fig.add_subplot()
+        graph.plot(self._plot_array)
         plt.title(self.title)
         plt.xlabel(self.xlab)
         plt.ylabel(self.ylab)
-        plt.savefig(file_name, format='png') #.gitignore uses *.png
+        plt.savefig(file_name, format='png')
+        graph.lines[0].remove()
