@@ -7,6 +7,7 @@ import gym
 from gym import spaces
 import cityflow
 import json
+from tools import render
 
 
 class CityFlowEnv(gym.Env):
@@ -29,6 +30,7 @@ class CityFlowEnv(gym.Env):
         self.phase_times = []
         self.data_file_name = None
         self.rendering = False
+        self.data_arr = []
         # self.reward_range = (-float("inf"), float(1))
 
         assert reward_func in self.metadata["reward_funcs"]
@@ -49,6 +51,12 @@ class CityFlowEnv(gym.Env):
                                  "avgSpeed": self._get_avg_speed,
                                  "avgQueue": self._get_avg_queue
                                  }
+
+        self.data_func_label_dict = {#"plotFileName": ["Plot Title","Plot X Label", "Plot Y Label", "line color"]
+                                     "plotWaitTime": ["Wait Time", "Step", "Seconds", "blue"],
+                                     "plotAvgSpeed": ["Average Speed", "Step", "Speed", "red"],
+                                     "plotAvgQueue": ["Average Queue", "Step", "Queue Length", "green"]
+                                    }                      
 
         # open cityflow config file into dict
         self.configDict = json.load(open(config_path))
@@ -97,6 +105,10 @@ class CityFlowEnv(gym.Env):
             for value in data_to_collect:
                 assert value in self.metadata["data_funcs"]
             self.data_funcs = data_to_collect
+
+        if not self.data_arr: #if array is empty
+            for i in range(len(self.data_funcs)):
+                self.data_arr.append([])
 
     def _get_obs(self):
         # Get Dictionary where keys are lane id's and values are the # of waiting vehicles in the lane
@@ -300,7 +312,11 @@ class CityFlowEnv(gym.Env):
                 print(self.data_funcs[i] + ": " + str(data[i]))
 
         if self.render_mode == "plot":
-            q_len_arr = []      # array of queue lengths to plot
+            data = self._collect_data()
+            for i, n in enumerate(data):
+                self.data_arr[i].append(n)
+                
+     
 
     def _collect_data(self):
         data = [None] * len(self.data_funcs)
@@ -344,3 +360,8 @@ class CityFlowEnv(gym.Env):
             if len(self.phase_times) > 0:
                 print(f"Average phase time: {mean(self.phase_times)} seconds")
             print("Closing...")
+        
+        if self.render_mode == "plot":
+            for i, (key, labels) in enumerate(self.data_func_label_dict.items()):
+                plot = render.RenderPlot(self.data_arr[i], labels[0], labels[1], labels[2], labels[3])
+                plot.export_plot(key)
