@@ -15,4 +15,4 @@ class RenderPlot:
         plt.title(self.title)
         plt.xlabel(self.xlab)
         plt.ylabel(self.ylab)
-        plt.savefig(file_name, format='png')
+        plt.savefig(file_name, format='png') #.gitignore uses *.png
