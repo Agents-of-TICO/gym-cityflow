@@ -173,7 +173,7 @@ class CityFlowEnv(gym.Env):
 
     def _get_reward_combo(self):
         reward = self._get_reward_phase_time()
-        reward += 12 * self._get_reward_avg_speed()
+        reward += 512 * self._get_reward_avg_speed()
         return reward
 
     def reset(self, seed=None, options=None):
