@@ -12,3 +12,7 @@ examples/default/replay.txt
 examples/default/replay_roadnet.json
 # IDE Files
 .idea/*
+gym_cityflow/__pycache__/__init__.cpython-38.pyc
+gym_cityflow/envs/__pycache__/__init__.cpython-38.pyc
+gym_cityflow/envs/__pycache__/cityflow_env.cpython-38.pyc
+

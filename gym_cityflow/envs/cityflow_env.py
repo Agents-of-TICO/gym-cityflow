@@ -1,6 +1,7 @@
 import sys
 import random
 from statistics import mean
+import datetime
 
 import gym
 from gym import spaces
@@ -9,12 +10,14 @@ import json
 
 
 class CityFlowEnv(gym.Env):
-    metadata = {"render_modes": ["human"], "max_waiting": 128,
-                "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "queue&TimeF", "avgSpeed", "phaseTime"]
+    metadata = {"render_modes": ["human", "file", "plot"], "max_waiting": 128,
+                "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "queue&TimeF", "avgSpeed",
+                                 "phaseTime", "combo"],
+                "data_funcs": ["waitTime", "avgSpeed", "avgQueue"]
                 }
 
     def __init__(self, config_path, episode_steps=10000, num_threads=1, reward_func="queueSum", seed=None,
-                 render_mode=None):
+                 data_to_collect=None, render_mode=None):
         self.episode_steps = episode_steps  # The number of steps to simulate
         self.current_step = 0
         self.total_wait_time = 0
@@ -24,6 +27,8 @@ class CityFlowEnv(gym.Env):
         self.config_path = config_path
         self.num_threads = num_threads
         self.phase_times = []
+        self.data_file_name = None
+        self.rendering = False
         # self.reward_range = (-float("inf"), float(1))
 
         assert reward_func in self.metadata["reward_funcs"]
@@ -34,10 +39,16 @@ class CityFlowEnv(gym.Env):
                                  "avgSpeed": self._get_reward_avg_speed,
                                  "queue&Time": self._get_reward_sum_and_phase_time,
                                  "queue&TimeF": self._get_reward_sum_and_phase_time_flat,
-                                 "phaseTime": self._get_reward_phase_time
+                                 "phaseTime": self._get_reward_phase_time,
+                                 "combo": self._get_reward_combo
                                  }
 
         print(f"Using reward function: {self.reward_func_dict[reward_func].__name__}")
+
+        self.data_func_dict = {"waitTime": self._get_wait_time,
+                                 "avgSpeed": self._get_avg_speed,
+                                 "avgQueue": self._get_avg_queue
+                                 }
 
         # open cityflow config file into dict
         self.configDict = json.load(open(config_path))
@@ -80,6 +91,13 @@ class CityFlowEnv(gym.Env):
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
 
+        if data_to_collect is None:
+            self.data_funcs = None
+        else:
+            for value in data_to_collect:
+                assert value in self.metadata["data_funcs"]
+            self.data_funcs = data_to_collect
+
     def _get_obs(self):
         # Get Dictionary where keys are lane id's and values are the # of waiting vehicles in the lane
         obs = self.eng.get_lane_waiting_vehicle_count()
@@ -106,7 +124,8 @@ class CityFlowEnv(gym.Env):
     # Time in current phase relative to phase_step_goal
     def _get_reward_phase_time(self):
         r_factor = 2
-        reward = None
+        reward = None   # Value between r_factor * (self.max_phase_time - self.phase_step_goal) and
+        # r_factor * self.phase_step_goal
         if 2 <= self.steps_in_current_phase <= self.phase_step_goal:
             # If the same phase as last time is selected, give reward proportional to the number of steps we have been
             # in the current stage compared to the phase_step_goal, offering a smaller reward as steps_in_current_phase
@@ -146,7 +165,16 @@ class CityFlowEnv(gym.Env):
 
     # Average Speed reward function
     def _get_reward_avg_speed(self):
-        return (sum(self.eng.get_vehicle_speed().values()) / 16.67) / self.eng.get_vehicle_count()
+        num_vehicles = self.eng.get_vehicle_count()
+        if num_vehicles == 0:
+            return 0
+        else:
+            return (sum(self.eng.get_vehicle_speed().values()) / 16.67) / num_vehicles
+
+    def _get_reward_combo(self):
+        reward = self._get_reward_phase_time()
+        reward += 12 * self._get_reward_queue_sum()
+        return reward
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
@@ -164,12 +192,10 @@ class CityFlowEnv(gym.Env):
         self.phase_times = []
         self.steps_in_current_phase = 0
         self.last_action = 0
+        self.data_file_name = None
 
         observation = self._get_obs()
         info = self._get_info()
-
-        if self.render_mode == "human":
-            self.render()
 
         # The Newest version of gym has info returned w/ reset but this causes issues with stable baselines 3
         return observation # , info
@@ -207,7 +233,7 @@ class CityFlowEnv(gym.Env):
         info = self._get_info()
         truncated = False
 
-        if self.render_mode == "human":
+        if self.render_mode is not None and self.rendering:
             self.render()
 
         # Update last action taken
@@ -248,12 +274,73 @@ class CityFlowEnv(gym.Env):
 
     def render(self):
         # Function called to render environment
-        print("Current time: " + str(self.eng.get_current_time()))
-        print("Running Total wait time: " + str(self.total_wait_time))
+        if self.render_mode == "human":
+            data = self._collect_data()
+            for i in range(len(self.data_funcs)):
+                print(self.data_funcs[i] + ": " + str(data[i]))
+
+        if self.render_mode == "file":
+            if self.data_file_name is None:
+                self.data_file_name = "data_" + str(datetime.datetime.now()).split(".")[0] + '.csv'
+                file = open(self.data_file_name, "a")
+                # Write in the headers since we are creating a new file
+                for i in range(len(self.data_funcs)):
+                    file.write(str(self.data_funcs[i]) + ", ")
+                file.write('\n')
+            else:
+                file = open(self.data_file_name, "a")
+
+            # Write the current steps data to file as one row
+            data = self._collect_data()
+            for i in range(len(self.data_funcs)):
+                file.write(str(data[i]) + ", ")
+            file.write('\n')
+            file.close()
+            for i in range(len(self.data_funcs)):
+                print(self.data_funcs[i] + ": " + str(data[i]))
+
+        if self.render_mode == "plot":
+            q_len_arr = []      # array of queue lengths to plot
+
+    def _collect_data(self):
+        data = [None] * len(self.data_funcs)
+        for i in range(len(data)):
+            data[i] = self.data_func_dict[self.data_funcs[i]]()
+        return data
+
+    def _get_wait_time(self):
+        # Number of waiting vehicles in current step multiplied by the step interval in seconds
+        return sum(self.eng.get_lane_waiting_vehicle_count().values()) * self.interval
+
+    def _get_avg_speed(self):
+        # Takes the total speed of the vehicles in the intersection and divides it by the number of vehicles.
+        num_vehicles = self.eng.get_vehicle_count()
+        if num_vehicles == 0:
+            return 0
+        else:
+            return sum(self.eng.get_vehicle_speed().values()) / num_vehicles
+
+    def _get_avg_queue(self):
+        # Take the total number of waiting vehicles and divides it by the number of lanes to get
+        # current average queue length.
+        queues = self.eng.get_lane_waiting_vehicle_count().values()
+        # Since get_lane_waiting_vehicle_count() also returns queues for outgoing lanes we divide the length of the
+        # array by 2 to get number of incoming lanes. This is only valid in the case of symmetric intersections
+        return sum(queues) / (len(queues) / 2)
+
+    def get_avg_travel_time(self):
+        return self.eng.get_average_travel_time()
+
+    def start_rendering(self):
+        self.rendering = True
+
+    def stop_rendering(self):
+        self.rendering = False
 
     def close(self):
         # if we need to do anything on env exit this is where we do it
-        print("Total wait time: " + str(self.total_wait_time))
-        if len(self.phase_times) > 0:
-            print(f"Average phase time: {mean(self.phase_times)} seconds")
-        print("Exiting...")
+        if self.render_mode == "human":
+            print("Total wait time: " + str(self.total_wait_time))
+            if len(self.phase_times) > 0:
+                print(f"Average phase time: {mean(self.phase_times)} seconds")
+            print("Closing...")
