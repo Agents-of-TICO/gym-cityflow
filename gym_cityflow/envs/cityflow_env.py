@@ -314,13 +314,7 @@ class CityFlowEnv(gym.Env):
             data = self._collect_data()
             for i, n in enumerate(data):
                 self.data_arr[i].append(n)
-            for i, (key, labels) in enumerate(self.data_func_label_dict.items()):
-                plot = render.RenderPlot(self.data_arr[i], labels[0], labels[1], labels[2])
-                plot.export_plot(key)
-
-
-            
-            
+     
 
     def _collect_data(self):
         data = [None] * len(self.data_funcs)
@@ -364,3 +358,8 @@ class CityFlowEnv(gym.Env):
             if len(self.phase_times) > 0:
                 print(f"Average phase time: {mean(self.phase_times)} seconds")
             print("Closing...")
+        
+        if self.render_mode == "plot":
+            for i, (key, labels) in enumerate(self.data_func_label_dict.items()):
+                plot = render.RenderPlot(self.data_arr[i], labels[0], labels[1], labels[2])
+                plot.export_plot(key)
