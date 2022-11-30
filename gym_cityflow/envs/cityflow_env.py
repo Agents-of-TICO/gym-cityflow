@@ -169,11 +169,11 @@ class CityFlowEnv(gym.Env):
         if num_vehicles == 0:
             return 0
         else:
-            return (sum(self.eng.get_vehicle_speed().values()) / 16.67) / num_vehicles
+            return sum(self.eng.get_vehicle_speed().values()) / num_vehicles
 
     def _get_reward_combo(self):
         reward = self._get_reward_phase_time()
-        reward += 12 * self._get_reward_queue_sum()
+        reward += 12 * self._get_reward_avg_speed()
         return reward
 
     def reset(self, seed=None, options=None):
