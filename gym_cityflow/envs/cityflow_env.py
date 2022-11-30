@@ -52,10 +52,10 @@ class CityFlowEnv(gym.Env):
                                  "avgQueue": self._get_avg_queue
                                  }
 
-        self.data_func_label_dict = {#"plotFileName": ["Plot Title","Plot X Label", "Plot Y Label"]
-                                     "plotWaitTime": ["Wait Time", "Step", "Seconds"],
-                                     "plotAvgSpeed": ["Average Speed", "Step", "Speed"],
-                                     "plotAvgQueue": ["Average Queue", "Step", "Queue Length"]
+        self.data_func_label_dict = {#"plotFileName": ["Plot Title","Plot X Label", "Plot Y Label", "line color"]
+                                     "plotWaitTime": ["Wait Time", "Step", "Seconds", "blue"],
+                                     "plotAvgSpeed": ["Average Speed", "Step", "Speed", "red"],
+                                     "plotAvgQueue": ["Average Queue", "Step", "Queue Length", "green"]
                                     }                      
 
         # open cityflow config file into dict
@@ -363,5 +363,5 @@ class CityFlowEnv(gym.Env):
         
         if self.render_mode == "plot":
             for i, (key, labels) in enumerate(self.data_func_label_dict.items()):
-                plot = render.RenderPlot(self.data_arr[i], labels[0], labels[1], labels[2])
+                plot = render.RenderPlot(self.data_arr[i], labels[0], labels[1], labels[2], labels[3])
                 plot.export_plot(key)
