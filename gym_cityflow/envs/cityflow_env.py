@@ -13,7 +13,7 @@ from tools import render
 class CityFlowEnv(gym.Env):
     metadata = {"render_modes": ["human", "file", "plot"], "max_waiting": 128,
                 "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "queue&TimeF", "avgSpeed",
-                                 "phaseTime", "combo"],
+                                 "phaseTime", "comboSpeed", "comboQueue"],
                 "data_funcs": ["waitTime", "avgSpeed", "avgQueue"]
                 }
 
@@ -42,7 +42,8 @@ class CityFlowEnv(gym.Env):
                                  "queue&Time": self._get_reward_sum_and_phase_time,
                                  "queue&TimeF": self._get_reward_sum_and_phase_time_flat,
                                  "phaseTime": self._get_reward_phase_time,
-                                 "combo": self._get_reward_combo
+                                 "comboSpeed": self._get_reward_combo_speed,
+                                 "comboQueue": self._get_reward_combo_queue,
                                  }
 
         print(f"Using reward function: {self.reward_func_dict[reward_func].__name__}")
@@ -183,9 +184,14 @@ class CityFlowEnv(gym.Env):
         else:
             return sum(self.eng.get_vehicle_speed().values()) / num_vehicles
 
-    def _get_reward_combo(self):
+    def _get_reward_combo_queue(self):
         reward = self._get_reward_phase_time()
-        reward += 512 * self._get_reward_avg_speed()
+        reward += 768 * self._get_reward_queue_sum()
+        return reward
+    
+    def _get_reward_combo_speed(self):
+        reward = self._get_reward_phase_time()
+        reward += 768 * self._get_reward_avg_speed()
         return reward
 
     def reset(self, seed=None, options=None):
