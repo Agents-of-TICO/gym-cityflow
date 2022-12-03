@@ -322,8 +322,6 @@ class CityFlowEnv(gym.Env):
             for i, n in enumerate(data):
                 self.data_arr[i].append(n)
                 
-     
-
     def _collect_data(self):
         data = [None] * len(self.data_funcs)
         for i in range(len(data)):
