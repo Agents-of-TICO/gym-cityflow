@@ -13,7 +13,7 @@ from tools import render
 class CityFlowEnv(gym.Env):
     metadata = {"render_modes": ["human", "file", "plot", "file_and_plot"], "max_waiting": 128,
                 "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "queue&TimeF", "avgSpeed",
-                                 "phaseTime", "combo"],
+                                 "phaseTime", "comboSpeed", "comboQueue"],
                 "data_funcs": ["waitTime", "avgSpeed", "avgQueue"]
                 }
 
@@ -42,7 +42,8 @@ class CityFlowEnv(gym.Env):
                                  "queue&Time": self._get_reward_sum_and_phase_time,
                                  "queue&TimeF": self._get_reward_sum_and_phase_time_flat,
                                  "phaseTime": self._get_reward_phase_time,
-                                 "combo": self._get_reward_combo
+                                 "comboSpeed": self._get_reward_combo_speed,
+                                 "comboQueue": self._get_reward_combo_queue,
                                  }
 
         print(f"Using reward function: {self.reward_func_dict[reward_func].__name__}")
@@ -181,11 +182,16 @@ class CityFlowEnv(gym.Env):
         if num_vehicles == 0:
             return 0
         else:
-            return (sum(self.eng.get_vehicle_speed().values()) / 16.67) / num_vehicles
+            return sum(self.eng.get_vehicle_speed().values()) / num_vehicles
 
-    def _get_reward_combo(self):
+    def _get_reward_combo_queue(self):
         reward = self._get_reward_phase_time()
-        reward += 12 * self._get_reward_queue_sum()
+        reward += 768 * self._get_reward_queue_sum()
+        return reward
+    
+    def _get_reward_combo_speed(self):
+        reward = self._get_reward_phase_time()
+        reward += 768 * self._get_reward_avg_speed()
         return reward
 
     def reset(self, seed=None, options=None):
@@ -315,7 +321,7 @@ class CityFlowEnv(gym.Env):
             data = self._collect_data()
             for i, n in enumerate(data):
                 self.data_arr[i].append(n)
-                
+
         if self.render_mode == "file_and_plot": 
             if self.data_file_name is None:
                 self.data_file_name = "data_" + str(datetime.datetime.now()).split(".")[0] + '.csv'
