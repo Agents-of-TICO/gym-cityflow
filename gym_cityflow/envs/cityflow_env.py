@@ -11,7 +11,7 @@ from tools import render
 
 
 class CityFlowEnv(gym.Env):
-    metadata = {"render_modes": ["human", "file", "plot"], "max_waiting": 128,
+    metadata = {"render_modes": ["human", "file", "plot", "file_and_plot"], "max_waiting": 128,
                 "reward_funcs": ["queueSum", "queueSquared", "phaseTime", "queue&Time", "queue&TimeF", "avgSpeed",
                                  "phaseTime", "comboSpeed", "comboQueue"],
                 "data_funcs": ["waitTime", "avgSpeed", "avgQueue"]
@@ -321,7 +321,29 @@ class CityFlowEnv(gym.Env):
             data = self._collect_data()
             for i, n in enumerate(data):
                 self.data_arr[i].append(n)
-                
+
+        if self.render_mode == "file_and_plot": 
+            if self.data_file_name is None:
+                self.data_file_name = "data_" + str(datetime.datetime.now()).split(".")[0] + '.csv'
+                file = open(self.data_file_name, "a")
+                # Write in the headers since we are creating a new file
+                for i in range(len(self.data_funcs)):
+                    file.write(str(self.data_funcs[i]) + ", ")
+                file.write('\n')
+            else:
+                file = open(self.data_file_name, "a")
+
+            # Write the current steps data to file as one row
+            data = self._collect_data()
+            for i, n in enumerate(data):
+                self.data_arr[i].append(n)
+            for i in range(len(self.data_funcs)):
+                file.write(str(data[i]) + ", ")
+            file.write('\n')
+            file.close()
+            for i in range(len(self.data_funcs)):
+                print(self.data_funcs[i] + ": " + str(data[i]))     
+
     def _collect_data(self):
         data = [None] * len(self.data_funcs)
         for i in range(len(data)):
@@ -366,6 +388,11 @@ class CityFlowEnv(gym.Env):
             print("Closing...")
         
         if self.render_mode == "plot":
+            for i, (key, labels) in enumerate(self.data_func_label_dict.items()):
+                plot = render.RenderPlot(self.data_arr[i], labels[0], labels[1], labels[2], labels[3])
+                plot.export_plot(key)
+
+        if self.render_mode == "file_and_plot":
             for i, (key, labels) in enumerate(self.data_func_label_dict.items()):
                 plot = render.RenderPlot(self.data_arr[i], labels[0], labels[1], labels[2], labels[3])
                 plot.export_plot(key)
