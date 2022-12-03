@@ -384,9 +384,9 @@ class CityFlowEnv(gym.Env):
         if self.render_mode == "plot":
             for i, (key, labels) in enumerate(self.data_func_label_dict.items()):
                 plot = render.RenderPlot(self.data_arr[i], labels[0], labels[1], labels[2], labels[3])
-                plot.export_plot(key)
+                plot.export_plot(str(key + ".png"))
 
         if self.render_mode == "file_and_plot":
             for i, (key, labels) in enumerate(self.data_func_label_dict.items()):
                 plot = render.RenderPlot(self.data_arr[i], labels[0], labels[1], labels[2], labels[3])
-                plot.export_plot(key)
+                plot.export_plot(str(key + ".png"))
