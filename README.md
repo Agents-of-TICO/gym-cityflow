@@ -100,3 +100,6 @@ env.close()
 
 For convenience, we have added some example CityFlow config.json, roadnet.json, and flow.json files 
 to 'examples/default' and 'examples/double_intersection'.
+
+## Project Report
+[Link to the paper associated with this repository.](https://1drv.ms/b/s!Aju09BcD1HExv-R4IsbDTrKkUUY-rQ?e=Fa0tRt)
