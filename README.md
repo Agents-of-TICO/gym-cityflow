@@ -75,7 +75,7 @@ the [OpenAI Documentation](https://gym.openai.com/docs/)
 `env.reset(seed=42)` can also be called with a new seed to restart the environment with a new seed
 
 Here is an example of how to train and run PPO on a CityFlow environment (NOTE: this example uses the PPO model provided
-by stable-baselines3 to facilitate training, if you want to run this example you should install stable-baselines3 with the
+by [stable-baselines3](https://github.com/DLR-RM/stable-baselines3) to facilitate training, if you want to run this example you should install stable-baselines3 with the
 command `pip install stable-baselines3`)
 
 ```python

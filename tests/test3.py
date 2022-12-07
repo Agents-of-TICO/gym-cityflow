@@ -8,4 +8,4 @@ env = gym.make(
     episode_steps=3600,
 )
 
-check_env(env)
+check_env(env.unwrapped)
